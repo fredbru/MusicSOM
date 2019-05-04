@@ -8,6 +8,7 @@ import os
 from xml.dom.minidom import parse
 import numpy as np
 from matplotlib import pyplot as plt
+import csv
 
 def addRelativePathToSystemPath(relPath):
     if __name__ == '__main__' and __package__ is None:
@@ -216,14 +217,21 @@ def makeAllFeatures(featureLength, numberOfBundles, grooves):
 
 np.set_printoptions(suppress=True,precision=2)
 
-path = "/home/fred/BFD/python/grooves/4-4-MILCTest/"
+path = "/home/fred/BFD/python/grooves/All-inc-percussion/"
 grooveFileNames = getGrooveFileNames(path)
 
 allGrooves = []
 allGrooveNames =[]
 paletteNames = []
+evalList = []
 
 numberOfBundles = len(grooveFileNames)
+evalGrooves = []
+with open("/home/fred/BFD/python/Similarity-Eval/eval-grooves-list.csv") as csvfile:
+    reader = csv.reader(csvfile, delimiter=",")
+    for row in reader:
+        evalGrooves.append(row[0])
+print(evalGrooves)
 
 # Iterate through list of groove files in given directory, extract grooves
 # in format for MusicSOM.py
@@ -233,12 +241,15 @@ for i in range(numberOfBundles):
     grooveList, bundleGrooveNames = getGroovesFromBundle(grooveDom)
     for j in range(len(bundleGrooveNames)):
         paletteNames.append(grooveFileNames[i][0:-8])
-        allGrooveNames.append(bundleGrooveNames[j])
+        #print(grooveFileNames[i][0:-8])
+        #allGrooveNames.append(bundleGrooveNames[j])
+        if bundleGrooveNames[j] in evalGrooves:
+            print(bundleGrooveNames[j])
+            allGrooveNames.append(bundleGrooveNames[j])
     allGrooves.append(grooveList)
 
 featureLength = 160 #320 - collapsed semi mode
 grooveFeatures = makeAllFeatures(featureLength, numberOfBundles, allGrooves)
 
-#print(allGrooves)
-np.save("4-4-MILCTest.npy", grooveFeatures)
-np.save("4-4-MILCTestNames.npy", np.vstack([allGrooveNames,paletteNames]))
+#np.save("Eval.npy", grooveFeatures)
+#np.save("Eval-names.npy", np.vstack([allGrooveNames,paletteNames]))
