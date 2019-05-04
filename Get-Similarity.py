@@ -11,13 +11,22 @@ for i in range(evalNames.shape[0]):
     if 'Blues CH1 b' in evalNames[i]:
         grooveB = evalGrooves[i]
 
-def euclideanDistance(grooveA, grooveB):
+def getEuclideanDistance(grooveA, grooveB):
     """Returns norm-2 of a 1-D numpy array for CPU computation.
     * faster than linalg.norm in case of 1-D arrays (numpy 1.9.2rc1).
     """
-    x = grooveA.flatten()-grooveB.flatten()
+    x = (grooveA.flatten()-grooveB.flatten())
     return math.sqrt(np.dot(x, x.T))
 
-print(grooveA-grooveB)
 
-print(1/(1+euclideanDistance(grooveA,grooveB)))
+def getDirectedSwapDistance(grooveA, grooveB):
+    # Directed swap: swap but for rhythms with variable #of onsets. Uses binary rhythms.
+    binaryA = np.ceil(grooveA).flatten()
+    binaryB = np.ceil(grooveB).flatten()
+    if binaryA.sum() > binaryB.sum(): #find which one has the most onsets
+        pass
+    else:
+
+    pass
+
+d = getDirectedSwapDistance(grooveA,grooveB)
