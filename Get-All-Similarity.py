@@ -45,9 +45,167 @@ def splitKitParts(groove):
     tom = groove[:,4]
     return kick, snare, closed, open, tom
 
+def getGomezFeatureDistance(A,B):
+    # binary for now. low syncopation, mid density, high density, hiness, hisyness
+    # low = kick, mid = snare and tom, hi = cymbals. summed simply - not trying to model loudness - two onsets at one
+    # time (eg snare and a tom hit) just count as one
+    # at the moment hisyness parameter dominates - much larger values than the rest - so divided it by 20 (the max value
+    # in the dataset
+
+
+    binaryA = np.ceil(A)
+    binaryB = np.ceil(B)
+
+    lowA, midA, highA = splitKitParts3Ways(binaryA)
+    lowB, midB, highB = splitKitParts3Ways(binaryB)
+
+    losync_A = getSyncopation(lowA)
+    losync_B = getSyncopation(lowB)
+
+
+    midD_A = getDensity(midA)
+    midD_B = getDensity(midB)
+
+    hiD_A = getDensity(highA)
+    hiD_B = getDensity(highB)
+
+    totalD_A = getDensity(binaryA)
+    totalD_B = getDensity(binaryB)
+
+    hiness_A = (float(hiD_A)/float(totalD_A))/10.0
+    hiness_B = (float(hiD_B)/float(totalD_B))/10.0
+
+    if hiD_A != 0:
+        hisynessA = float(getSyncopation(highA))/float(np.count_nonzero(highA == 1))
+    else:
+        hisynessA = 0
+
+    if hiD_B != 0:
+        hisynessB = float(getSyncopation(highB)) / float(np.count_nonzero(highB == 1))
+    else:
+        hisynessB = 0
+
+    # print(hisynessA,hiness_A,hiD_A,midD_A,losync_A)
+    vectorA = np.hstack([losync_A, midD_A, hiD_A, hiness_A, hisynessA])
+    vectorB = np.hstack([losync_B, midD_B, hiD_B, hiness_B, hisynessB])
+
+    return getEuclideanDistance(vectorA, vectorB)
+
+
+def getWitekSyncopationDistance(A,B):
+    # Get syncopation distance for loop based on Witek 2014
+    # salience profile different to gomez/longuet higgins + lee
+    # Combines insrument weighting for cross-instrument syncopation. For now - just considering witek's 3 syncopation
+    # types with 3 kit parts. Later look at implementing 4 parts: add open hi hat, and syncopation with hi hat off pulse
+    # then look at adding velocity somehow (use velocity of syncopating part?)
+
+    salienceProfile = [0,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3,
+                       0,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3,0]
+    binaryA = np.ceil(A)
+    binaryB = np.ceil(B)
+
+    lowA, midA, highA = splitKitParts3Ways(binaryA)
+    lowB, midB, highB = splitKitParts3Ways(binaryB)
+    totalSyncopation = 0
+
+    for i in range(len(lowA)):
+        print(i)
+        kickSync = findKickSync(lowA, midA, highA, i, salienceProfile)
+        snareSync = findKickSync(lowA, midA, highA, i, salienceProfile)
+        totalSyncopation += kickSync
+        totalSyncopation += snareSync
+
+    for i in range(len(lowB)):
+        kickSync = findKickSync(lowB, midB, highB, i, salienceProfile)
+        snareSync = findKickSync(lowB, midB, highB, i, salienceProfile)
+        totalSyncopation += kickSync
+        totalSyncopation += snareSync
+    return totalSyncopation
+
+def findKickSync(low, mid, high, i, salienceProfile):
+    # find instances  when kick syncopates against hi hat/snare on the beat
+    kickSync = 0
+    if low[i] == 1.0:
+        if high[(i+1)%32] == 1.0 and mid[(i+1)%32] == 1.0:
+            if salienceProfile[i+1] > salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
+                kickSync = 2
+        elif mid[(i+1)%32] == 1.0:
+            if salienceProfile[i + 1] > salienceProfile[i]: #my own estimate - more syncopated that hi hat on pulse too (?)
+                kickSync = 3
+        elif high[(i+1)%32] == 1.0:
+            if salienceProfile[i + 1] > salienceProfile[i]:
+                kickSync = 5
+    return kickSync
+
+def findSnareSync(low, mid, high, i, salienceProfile):
+    # find instances  when snare syncopates against hi hat/kick on the beat
+    snareSync = 0
+    if mid[i] == 1.0:
+        if high[(i+1)%32] == 1.0 and low[(i+1)%32] == 1.0:
+            if salienceProfile[i + 1] > salienceProfile[i]:
+                snareSync = 1
+        elif high[(i+1)%32] == 1.0:
+            if salienceProfile[i+1] > salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
+                snareSync = 5
+        elif low[(i+1)%32] == 1.0:
+            if salienceProfile[i + 1] > salienceProfile[i]: # my best guess - kick without hi hat
+                snareSync = 1
+    return snareSync
+
+def findHiHatSync(low, mid, high, i, salienceProfile):
+    # find instances  when hiaht syncopates against snare/kick on the beat. this is my own adaptation of Witek 2014
+    # may or may not work. currently doesn't consider velocity or open hi hats
+    hihatSync = 0
+    if high[i] == 1.0:
+        if low[(i+1)%32] == 1.0:
+            if salienceProfile[i+1] > salienceProfile[i]:
+                hihatSync = 1 ### bit of a guess - maybe should be 0.5?
+        elif mid[(i+1)%32] == 1.0:
+            if salienceProfile[i + 1] > salienceProfile[i]:
+                hihatSync =1 ### another guess
+    return hihatSync
+
+
+def getSyncopation(part):
+    # From Longuet-Higgins  and  Lee 1984 metric profile. theres a -5 in gomez's code for who knows why.
+    # for now, just normalise the syncopation by dividing by the largest number in dataset
+    #The level  of  the  topmost  metrical  unit isarbitrarily set equal to 0, and the level of any other unit is
+    # assigned thevalue n-1, where n is the level of its parent unit in the rhythm - is this why you need a 5?
+    salienceProfile = [5, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 1,
+                       4, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 1, 5] # extra value for comparing forwards
+
+    syncopation = 0
+    for i in range(len(part)):
+        if part[i] == 1:
+            if part[(i+1)%32] == 0: #only syncopation when not followed immediately by another onset
+                syncopation = syncopation + abs(salienceProfile[i] - 5) #syncopation = difference in profile weights
+    return syncopation
+
+def getDensity(part):
+    # get density for one or more kit parts
+    numSteps = part.size
+    numOnsets = np.count_nonzero(part == 1)
+    density = float(numOnsets)/float(numSteps)
+    return density
+
+def splitKitParts3Ways(groove):
+    kick = groove[:,0]
+    snare = groove[:,1]
+    closed = groove[:,2]
+    open = groove[:,3]
+    tom = groove[:,4]
+
+    low = kick
+    mid = np.clip(snare + tom, 0, 1)
+    high = np.clip(closed + open, 0, 1)
+
+    return low, mid, high
+
 allEuclideanDistances = []
 allHammingDistances = []
 allEditDistances = []
+allGomezDistances = []
+allWitekDistances = []
 j=0
 with open("/home/fred/BFD/python/Similarity-Eval/eval-pairings.csv") as csvfile:
     reader = csv.reader(csvfile, delimiter=",")
@@ -62,15 +220,19 @@ with open("/home/fred/BFD/python/Similarity-Eval/eval-pairings.csv") as csvfile:
         euclideanRhythmDistance = getEuclideanDistance(a,b)
         hammingDistance = getHammingDistance(a,b)
         editdistance = getEditDistance(a,b)
+        gomezDistance = getGomezFeatureDistance(a,b)
+        witekDistance = getWitekSyncopationDistance(a,b)
 
         allEuclideanDistances.append(euclideanRhythmDistance)
         allHammingDistances.append(hammingDistance)
         allEditDistances.append(editdistance)
+        allGomezDistances.append(gomezDistance)
+        allWitekDistances.append(witekDistance)
 
-        print(aName + "  " + bName + '    Euclidean = ' + str(euclideanRhythmDistance) + "Hamming = "
-              + str(hammingDistance))
+        # print(aName + "  " + bName + '    Euclidean = ' + str(euclideanRhythmDistance) + "Hamming = "
+        #       + str(hammingDistance))
         j=j+1
-
+print(allWitekDistances)
 plt.figure()
 plt.hold(True)
 plt.bar(np.arange(100),allEuclideanDistances)
@@ -83,4 +245,12 @@ plt.title("Hamming Distances")
 plt.figure()
 plt.bar(np.arange(100),allEditDistances)
 plt.title("Edit Distances")
+
+plt.figure()
+plt.bar(np.arange(100),allGomezDistances)
+plt.title("Gomez Feature Distances")
+
+plt.figure()
+plt.bar(np.arange(100),allWitekDistances)
+plt.title("Witek Feature Distances")
 plt.show()
