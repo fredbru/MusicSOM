@@ -26,12 +26,21 @@ def getDirectedSwapDistance(a, b):
     binaryB = np.ceil(b).flatten()
     pass
 
-def getEditDistance(a,b):
+def getBinaryEditDistance(A,B):
     # get edit distance no velocity
-    binaryA = np.ceil(a)
-    binaryB = np.ceil(b)
+    binaryA = np.ceil(A)
+    binaryB = np.ceil(B)
     aKick, aSnare, aClosed, aOpen, aTom = splitKitParts(binaryA)
     bKick, bSnare, bClosed, bOpen, bTom = splitKitParts(binaryB)
+    combinedEditDistance = edcalc.eval(aKick,bKick) + edcalc.eval(aSnare,bSnare) + \
+                           edcalc.eval(aClosed,bClosed) + edcalc.eval(aOpen,bOpen) + \
+                           edcalc.eval(aTom,bTom)
+    return combinedEditDistance
+
+def getVelocityEditDistance(A,B):
+    # get edit distance no velocity
+    aKick, aSnare, aClosed, aOpen, aTom = splitKitParts(A)
+    bKick, bSnare, bClosed, bOpen, bTom = splitKitParts(B)
     combinedEditDistance = edcalc.eval(aKick,bKick) + edcalc.eval(aSnare,bSnare) + \
                            edcalc.eval(aClosed,bClosed) + edcalc.eval(aOpen,bOpen) + \
                            edcalc.eval(aTom,bTom)
@@ -85,12 +94,47 @@ def getGomezFeatureDistance(A,B):
     else:
         hisynessB = 0
 
-    # print(hisynessA,hiness_A,hiD_A,midD_A,losync_A)
-    vectorA = np.hstack([losync_A, midD_A, hiD_A, hiness_A, hisynessA])
-    vectorB = np.hstack([losync_B, midD_B, hiD_B, hiness_B, hisynessB])
-
+    featureWeighting = np.array([-0.66, -0.86,-0.068,-0.266,+0.118]) #might need to switch signs on this (-/+)
+    vectorA = np.hstack([midD_A, hiD_A, hiness_A, losync_A, hisynessA]*featureWeighting)
+    vectorB = np.hstack([midD_B, hiD_B, hiness_B, losync_B, hisynessB]*featureWeighting)
+    print(vectorA)
+    print(vectorB)
     return getEuclideanDistance(vectorA, vectorB)
 
+def getSyncopation(part):
+    # From Longuet-Higgins  and  Lee 1984 metric profile. theres a -5 in gomez's code for who knows why.
+    # for now, just normalise the syncopation by dividing by the largest number in dataset
+    #The level  of  the  topmost  metrical  unit is arbitrarily set equal to 0, and the level of any other unit is
+    # assigned thevalue n-1, where n is the level of its parent unit in the rhythm - is this why you need a 5?
+    salienceProfile = [5, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 1,
+                       4, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 1, 5] # extra value for comparing forwards
+
+    syncopation = 0
+    for i in range(len(part)):
+        if part[i] == 1:
+            if part[(i+1)%32] == 0: #only syncopation when not followed immediately by another onset
+                syncopation = syncopation + abs(salienceProfile[i] - 5) #syncopation = difference in profile weights
+    return syncopation
+
+def getDensity(part):
+    # get density for one or more kit parts
+    numSteps = part.size
+    numOnsets = np.count_nonzero(part == 1)
+    density = float(numOnsets)/float(numSteps)
+    return density
+
+def splitKitParts3Ways(groove):
+    kick = groove[:,0]
+    snare = groove[:,1]
+    closed = groove[:,2]
+    open = groove[:,3]
+    tom = groove[:,4]
+
+    low = kick
+    mid = np.clip(snare + tom, 0, 1)
+    high = np.clip(closed + open, 0, 1)
+
+    return low, mid, high
 
 def getWitekSyncopationDistance(A,B):
     # Get syncopation distance for loop based on Witek 2014
@@ -107,9 +151,9 @@ def getWitekSyncopationDistance(A,B):
     lowA, midA, highA = splitKitParts3Ways(binaryA)
     lowB, midB, highB = splitKitParts3Ways(binaryB)
     totalSyncopation = 0
+    totalSyncopation = 0
 
     for i in range(len(lowA)):
-        print(i)
         kickSync = findKickSync(lowA, midA, highA, i, salienceProfile)
         snareSync = findKickSync(lowA, midA, highA, i, salienceProfile)
         totalSyncopation += kickSync
@@ -120,10 +164,12 @@ def getWitekSyncopationDistance(A,B):
         snareSync = findKickSync(lowB, midB, highB, i, salienceProfile)
         totalSyncopation += kickSync
         totalSyncopation += snareSync
+    print(totalSyncopation)
     return totalSyncopation
 
 def findKickSync(low, mid, high, i, salienceProfile):
-    # find instances  when kick syncopates against hi hat/snare on the beat
+    # find instances  when kick syncopates against hi hat/snare on the beat. looking for kick proceeded by another hit
+    # on a weaker metrical position
     kickSync = 0
     if low[i] == 1.0:
         if high[(i+1)%32] == 1.0 and mid[(i+1)%32] == 1.0:
@@ -166,44 +212,10 @@ def findHiHatSync(low, mid, high, i, salienceProfile):
     return hihatSync
 
 
-def getSyncopation(part):
-    # From Longuet-Higgins  and  Lee 1984 metric profile. theres a -5 in gomez's code for who knows why.
-    # for now, just normalise the syncopation by dividing by the largest number in dataset
-    #The level  of  the  topmost  metrical  unit isarbitrarily set equal to 0, and the level of any other unit is
-    # assigned thevalue n-1, where n is the level of its parent unit in the rhythm - is this why you need a 5?
-    salienceProfile = [5, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 1,
-                       4, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 1, 5] # extra value for comparing forwards
-
-    syncopation = 0
-    for i in range(len(part)):
-        if part[i] == 1:
-            if part[(i+1)%32] == 0: #only syncopation when not followed immediately by another onset
-                syncopation = syncopation + abs(salienceProfile[i] - 5) #syncopation = difference in profile weights
-    return syncopation
-
-def getDensity(part):
-    # get density for one or more kit parts
-    numSteps = part.size
-    numOnsets = np.count_nonzero(part == 1)
-    density = float(numOnsets)/float(numSteps)
-    return density
-
-def splitKitParts3Ways(groove):
-    kick = groove[:,0]
-    snare = groove[:,1]
-    closed = groove[:,2]
-    open = groove[:,3]
-    tom = groove[:,4]
-
-    low = kick
-    mid = np.clip(snare + tom, 0, 1)
-    high = np.clip(closed + open, 0, 1)
-
-    return low, mid, high
-
 allEuclideanDistances = []
 allHammingDistances = []
 allEditDistances = []
+allVelocityEditDistances = []
 allGomezDistances = []
 allWitekDistances = []
 j=0
@@ -219,20 +231,22 @@ with open("/home/fred/BFD/python/Similarity-Eval/eval-pairings.csv") as csvfile:
                 b = allGrooves[i]
         euclideanRhythmDistance = getEuclideanDistance(a,b)
         hammingDistance = getHammingDistance(a,b)
-        editdistance = getEditDistance(a,b)
+        bineditdistance = getBinaryEditDistance(a,b)
+        velocityEditdistance = getVelocityEditDistance(a,b)
         gomezDistance = getGomezFeatureDistance(a,b)
         witekDistance = getWitekSyncopationDistance(a,b)
 
         allEuclideanDistances.append(euclideanRhythmDistance)
         allHammingDistances.append(hammingDistance)
-        allEditDistances.append(editdistance)
+        allEditDistances.append(bineditdistance)
+        allVelocityEditDistances.append(velocityEditdistance)
         allGomezDistances.append(gomezDistance)
         allWitekDistances.append(witekDistance)
 
         # print(aName + "  " + bName + '    Euclidean = ' + str(euclideanRhythmDistance) + "Hamming = "
         #       + str(hammingDistance))
         j=j+1
-print(allWitekDistances)
+
 plt.figure()
 plt.hold(True)
 plt.bar(np.arange(100),allEuclideanDistances)
@@ -245,6 +259,10 @@ plt.title("Hamming Distances")
 plt.figure()
 plt.bar(np.arange(100),allEditDistances)
 plt.title("Edit Distances")
+
+plt.figure()
+plt.bar(np.arange(100), allVelocityEditDistances)
+plt.title("Velocity Edit distances")
 
 plt.figure()
 plt.bar(np.arange(100),allGomezDistances)

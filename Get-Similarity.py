@@ -19,15 +19,24 @@ def getDirectedSwapDistance(A, B):
     # aKick, aSnare, aClosed, aOpen, aTom = splitKitParts(binaryA)
     # bKick, bSnare, bClosed, bOpen, bTom = splitKitParts(binaryB)
 
-def getEditDistance(A,B):
+def getBinaryEditDistance(A,B):
     # get edit distance no velocity
     binaryA = np.ceil(A)
     binaryB = np.ceil(B)
     aKick, aSnare, aClosed, aOpen, aTom = splitKitParts(binaryA)
     bKick, bSnare, bClosed, bOpen, bTom = splitKitParts(binaryB)
-    combinedEditDistance = editdistance.eval(aKick,bKick) + editdistance.eval(aSnare+bSnare) + \
-                           editdistance.eval(aClosed+bClosed) + editdistance.eval(aOpen,bOpen) + \
-                           editdistance.eval(aTom+bTom)
+    combinedEditDistance = editdistance.eval(aKick,bKick) + editdistance.eval(aSnare,bSnare) + \
+                           editdistance.eval(aClosed,bClosed) + editdistance.eval(aOpen,bOpen) + \
+                           editdistance.eval(aTom,bTom)
+    print(combinedEditDistance)
+
+def getVelocityEditDistance(A,B):
+    # get edit distance no velocity
+    aKick, aSnare, aClosed, aOpen, aTom = splitKitParts(A)
+    bKick, bSnare, bClosed, bOpen, bTom = splitKitParts(B)
+    combinedEditDistance = editdistance.eval(aKick,bKick) + editdistance.eval(aSnare,bSnare) + \
+                           editdistance.eval(aClosed,bClosed) + editdistance.eval(aOpen,bOpen) + \
+                           editdistance.eval(aTom,bTom)
     print(combinedEditDistance)
 
 def getGomezFeatureDistance(A,B):
@@ -58,23 +67,31 @@ def getGomezFeatureDistance(A,B):
 
     hisynessA = float(getSyncopation(highA))/float(np.count_nonzero(highA == 1))
     hisynessB = float(getSyncopation(highB))/float(np.count_nonzero(highB == 1))
-    print(hisynessA,hiness_A,hiD_A,midD_A,losync_A)
-    print(lowA)
-    print(highA)
+    print(np.count_nonzero(highA == 1))
+
+    featureWeighting = np.array([0.66, 0.86,0.068,0.266,-0.118]) #might need to switch signs on this (-/+)
+    vectorA = np.hstack([losync_A, midD_A, hiD_A, hiness_A, hisynessA]*featureWeighting)
+    vectorB = np.hstack([losync_B, midD_B, hiD_B, hiness_B, hisynessB]*featureWeighting)
+    print(vectorA)
+    print(vectorB)
+    return getEuclideanDistance(vectorA, vectorB)
+
 
 
 def getSyncopation(part):
-    # From Longuet-Higgins  and  Lee 1984 metric profile. i+1 = R, i=N
+    # From Longuet-Higgins  and  Lee 1984 metric profile.
+    # for now, just normalise the syncopation by dividing by the largest number in dataset
+    #The level  of  the  topmost  metrical  unit isa rbitrarily set equal to 0, and the level of any other unit is
+    # assigned thevalue n-1, where n is the level of its parent unit in the rhythm - is this why you need a 5?
+    # as of 13/5 - added velocity - just multiply by velocity at part. will be 1 anyway for binary
     salienceProfile = [5, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 1,
                        4, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 1, 3, 1, 2, 1, 5] # extra value for comparing forwards
-    syncopation = 0
 
+    syncopation = 0
     for i in range(len(part)):
-        if part[i] == 1.0:
+        if part[i] != 0:
             if part[(i+1)%32] == 0: #only syncopation when not followed immediately by another onset
-                # ???if salienceProfile[i] < salienceProfile[i+1]: #weight of note before must be smaller than weight of note after
-                syncopation = syncopation + (salienceProfile[i]-5) #syncopation = difference in profile weights
-                print(syncopation)
+                syncopation = syncopation + (abs(salienceProfile[i] - 5)*part[i]) #syncopation = difference in profile weights
     return syncopation
 
 def getWitekSyncopationDistance(A,B):
@@ -92,22 +109,26 @@ def getWitekSyncopationDistance(A,B):
     lowA, midA, highA = splitKitParts3Ways(binaryA)
     lowB, midB, highB = splitKitParts3Ways(binaryB)
     totalSyncopation = 0
+    totalSyncopation = 0
 
     for i in range(len(lowA)):
         kickSync = findKickSync(lowA, midA, highA, i, salienceProfile)
         snareSync = findKickSync(lowA, midA, highA, i, salienceProfile)
         totalSyncopation += kickSync
         totalSyncopation += snareSync
+        print(totalSyncopation)
 
     for i in range(len(lowB)):
         kickSync = findKickSync(lowB, midB, highB, i, salienceProfile)
         snareSync = findKickSync(lowB, midB, highB, i, salienceProfile)
         totalSyncopation += kickSync
         totalSyncopation += snareSync
+        print(totalSyncopation)
     return totalSyncopation
 
 def findKickSync(low, mid, high, i, salienceProfile):
-    # find instances  when kick syncopates against hi hat/snare on the beat
+    # find instances  when kick syncopates against hi hat/snare on the beat. looking for kick proceeded by another hit
+    # on a weaker metrical position
     kickSync = 0
     if low[i] == 1.0:
         if high[(i+1)%32] == 1.0 and mid[(i+1)%32] == 1.0:
@@ -150,8 +171,6 @@ def findHiHatSync(low, mid, high, i, salienceProfile):
     return hihatSync
 
 
-
-
 def getDensity(part):
     # get density for one or more kit parts
     numSteps = part.size
@@ -185,6 +204,56 @@ def calculateMonoSwapDistance(partA, partB):
     if partA.sum() > partB.sum():
         pass
 
+def getPanteliFeatures(A):
+    # 6 features:
+    # Autocorellation: skewness, max amplitude, centroid, harmonicity of peaks
+    # Theirs were 4 bar patterns
+    # weighted syncopation (same as Gomez but with velocity)
+    # symmetry of metrical profile
+    # Denotes the ratio of the number of onsets in the second half of the pattern that appear in
+    # exactly the same position in the first half of the pattern
+
+    #symmetry: number of onsets in the same position for bars 1 and 2
+    low,mid,high = splitKitParts3Ways(A)
+    lowSym = getSymmetry1Part(low)
+    midSym = getSymmetry1Part(mid)
+    highSym = getSymmetry1Part(high)
+    averageSymmetry = (lowSym + midSym + highSym)/3.0 #this works
+
+    #syncopation - same as Gomez, using velocity though
+    lowSync = getSyncopation(low)
+    midSync = getSyncopation(mid)
+    highSync = getSyncopation(high)
+    averageSync = (lowSync + midSync + highSync)/3.0
+    lowC = getAutocorrelation(low)
+    midC = getAutocorrelation(mid)
+    highC = getAutocorrelation(high)
+
+    #
+
+def getAutocorrelation(part):
+    # the plotting looks right. now need to make sure I can get right features
+    result = np.correlate(part,part,mode='full')
+    print(part)
+    from pandas import Series
+    from pandas.tools.plotting import autocorrelation_plot
+
+    import matplotlib.pyplot as plt
+    plt.figure()
+    autocorrelation_plot(part)
+    plt.show()
+
+
+def getSymmetry1Part(part):
+    sym = 0
+    part1 = part[0:16]
+    part2 = part[16:32]
+    for i in range(16):
+        if part1[i] != 0 and part2[i] != 0:
+            sym +=1
+    print(sym)
+    return sym
+
 def testMonoEditDistance():
     A = np.array([1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0])
     B = np.array([1, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0])
@@ -199,9 +268,12 @@ evalGrooves = np.load('Eval-matricies.npy')
 evalNames = np.load('Eval-names.npy')
 
 for i in range(evalNames.shape[0]):
-    if 'Funk CH1 a' in evalNames[i]:
+    if 'Heavy Metal OH3 FBar3' in evalNames[i]:
         A = evalGrooves[i]
-    if 'Blues CH1 b' in evalNames[i]:
+    if 'Funk Ride a' in evalNames[i]:
         B = evalGrooves[i]
 
-print(getWitekSyncopationDistance(A,B))
+# getBinaryEditDistance(A,B)
+# getVelocityEditDistance(A,B)
+
+getPanteliFeatures(B)
