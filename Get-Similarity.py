@@ -225,9 +225,46 @@ def getPanteliFeatures(A):
     midSync = getSyncopation(mid)
     highSync = getSyncopation(high)
     averageSync = (lowSync + midSync + highSync)/3.0
+
+    # autocorrelation features - sum across stream then calculate features
     lowC = getAutocorrelation(low)
     midC = getAutocorrelation(mid)
     highC = getAutocorrelation(high)
+
+    autoCorrelationSum = (lowC+midC+highC)/3.0
+    autoCorrelationMaxAmplitude = autoCorrelationSum.max() #max, summed and scaled between 0 and 1
+    #print("Max Amplitude" + str(autoCorrelationMaxAmplitude))
+
+    from scipy import stats
+    autoCorrelationSkew = stats.skew(autoCorrelationSum)
+
+    # import pandas as pd
+    # print(pd.DataFrame(lowC).skew(axis=0))
+    # print(pd.DataFrame(midC).skew(axis=0))
+    # print(pd.DataFrame(highC).skew(axis=0))
+
+    #centroid
+
+    print(getCentroid(lowC))
+    print(getCentroid(midC))
+    print(getCentroid(highC))
+
+
+    #harmonicity
+    # find peaks.
+
+
+
+
+def getCentroid(part):
+    # weighted mean of all frequencies in the signal.
+    # weight = level of periodicity. mean = /32.
+    # result value is how much weight is in higher periodicities vs lower (amount of fast repetitions vs low)
+    centroidSum = 0
+    for i in range(len(part)):
+        centroidSum += part[i]*i
+    centroid = centroidSum# / 32.0
+    return centroid
 
 
 
@@ -238,15 +275,14 @@ def getAutocorrelation(part):
     from pandas import Series
     from pandas.plotting import autocorrelation_plot
 
+
     import matplotlib.pyplot as plt
-    ax = autocorrelation_plot(part)
     plt.figure()
+    ax = autocorrelation_plot(part)
     autocorrelation = ax.lines[5].get_data()[1]
-    print(autocorrelation.shape)
-    plt.plot(range(1,33),autocorrelation) #plots from 1 to 32 inclusive
-
+    plt.plot(range(1,33),autocorrelation) #plots from 1 to 32 inclusive - autocorrelation starts from 1 not 0 - 1-32
     plt.show()
-
+    return autocorrelation
 
 def getSymmetry1Part(part):
     sym = 0
