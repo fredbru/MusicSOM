@@ -229,18 +229,22 @@ def getPanteliFeatures(A):
     midC = getAutocorrelation(mid)
     highC = getAutocorrelation(high)
 
-    #
+
 
 def getAutocorrelation(part):
     # the plotting looks right. now need to make sure I can get right features
-    result = np.correlate(part,part,mode='full')
+    #result = np.correlate(part,part,mode='full')
     print(part)
     from pandas import Series
-    from pandas.tools.plotting import autocorrelation_plot
+    from pandas.plotting import autocorrelation_plot
 
     import matplotlib.pyplot as plt
+    ax = autocorrelation_plot(part)
     plt.figure()
-    autocorrelation_plot(part)
+    autocorrelation = ax.lines[5].get_data()[1]
+    print(autocorrelation.shape)
+    plt.plot(range(1,33),autocorrelation) #plots from 1 to 32 inclusive
+
     plt.show()
 
 
