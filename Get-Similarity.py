@@ -244,14 +244,39 @@ def getPanteliFeatures(A):
     # print(pd.DataFrame(highC).skew(axis=0))
 
     #centroid
-
-    print(getCentroid(lowC))
-    print(getCentroid(midC))
-    print(getCentroid(highC))
-
+    autoCorrelationCentroid = getCentroid(autoCorrelationSum)
 
     #harmonicity
-    # find peaks.
+    # find peaks. Measures whether periodicities occur in harmonic relation to the beat (feature value = 1) or
+    # inharmonic (feature value = 0)
+    print(getHarmonicity(midC))
+    #print(getHarmonicity(highC))
+
+
+
+def getHarmonicity(part):
+    # need to 0 out negative periodicities.
+    # this appears to be working - close to 1 for perfect harmonicity, close to 0 for zero harmonicity
+    alpha = 0.15
+    for i in range(len(part)):
+        if part[i] < 0:
+            part[i]=0
+    from scipy.signal import find_peaks
+    peaks = np.asarray(find_peaks(part)) #weird syntax due to 2.x/3.x compatibility issues here
+    peaks = peaks[0] + 1#peaks = lags
+    inharmonicSum = 0.0
+    inharmonicPeaks = []
+    for i in range(len(peaks)):
+        remainder1 = 16%peaks[i]
+        #remainder2 = 16%peaks[i]
+        if remainder1 > 16*0.15 and remainder1 < 16*0.85:
+            print("inharmonic peaks = ", part[peaks[i]-1], peaks[i])
+            inharmonicSum += part[peaks[i]-1] #add magnitude of inharmonic peaks
+            inharmonicPeaks.append(part[i])
+
+    harmonicity = math.exp((-0.25*len(peaks)*inharmonicSum/float(part.max())))
+    return harmonicity
+
 
 
 
