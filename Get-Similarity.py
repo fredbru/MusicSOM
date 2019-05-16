@@ -257,13 +257,17 @@ def getPanteliFeatures(A):
 
 
 def getCentroid(part):
-    # weighted mean of all frequencies in the signal.
-    # weight = level of periodicity. mean = /32.
-    # result value is how much weight is in higher periodicities vs lower (amount of fast repetitions vs low)
+    # weighted mean of all frequencies in the signal. add all periodicities then divide by total weight
+    # weight = level of periodicity.
+    # remove negative periodicities - not relevant and give a - answer which is weird and unhelpful.
     centroidSum = 0
+    totalWeights = 0
     for i in range(len(part)):
-        centroidSum += part[i]*i
-    centroid = centroidSum# / 32.0
+        addition = part[i]*i
+        if addition >= 0:
+            totalWeights += part[i]
+            centroidSum +=addition
+    centroid = centroidSum / totalWeights
     return centroid
 
 
@@ -312,6 +316,7 @@ for i in range(evalNames.shape[0]):
         A = evalGrooves[i]
     if 'Funk Ride a' in evalNames[i]:
         B = evalGrooves[i]
+    C = evalGrooves[12]
 
 # getBinaryEditDistance(A,B)
 # getVelocityEditDistance(A,B)
