@@ -21,14 +21,23 @@ def getEuclideanRhythmDistance(a, b):
     """Returns norm-2 of a 1-D numpy array for CPU computation.
     * faster than linalg.norm in case of 1-D arrays (numpy 1.9.2rc1).
     """
+    lA,mA,hA = splitKitParts3Ways(a)
+    a = np.hstack([lA,mA,hA])
+    lB,mB,hB = splitKitParts3Ways(b)
+    b = np.hstack([lB,mB,hB])
+
     x = (np.power(a,1.0/5.0).flatten()-np.power(b,1.0/5.0).flatten())
     return math.sqrt(np.dot(x, x.T))
 
 def getHammingDistance(a, b):
     # Same as euclidean, without velocity
-    binaryA = np.ceil(a).flatten()
-    binaryB = np.ceil(b).flatten()
-    return np.count_nonzero(binaryA != binaryB)
+    binaryA = np.ceil(a)
+    binaryB = np.ceil(b)
+    lA,mA,hA = splitKitParts3Ways(a)
+    a = np.hstack([lA,mA,hA])
+    lB,mB,hB = splitKitParts3Ways(b)
+    b = np.hstack([lB,mB,hB])
+    return np.count_nonzero(a != b)
 
 def getDirectedSwapDistance(a, b):
     # Directed swap: swap but for rhythms with variable #of onsets. Uses binary rhythms.
@@ -109,7 +118,7 @@ def getGomezFeatureDistance(A,B):
     else:
         hisynessB = 0
 
-    featureWeighting = np.array([-0.66, -0.186,-0.68,-0.019,+0.118]) #might need to switch signs on this (-/+)
+    featureWeighting = np.array([-0.58, -0.146,-0.88,-0.0194,+0.110]) #might need to switch signs on this (-/+)
     vectorA = np.hstack([midD_A, hiD_A, hiness_A, losync_A, hisynessA]*featureWeighting)
     vectorB = np.hstack([midD_B, hiD_B, hiness_B, losync_B, hisynessB]*featureWeighting)
     return getEuclideanDistance(vectorA, vectorB)
@@ -127,7 +136,7 @@ def getSyncopation(part):
     for i in range(len(part)):
         if part[i] != 0:
             if part[(i+1)%32] == 0.0: #only syncopation when not followed immediately by another onset
-                syncopation = float(syncopation + (abs(salienceProfile[i] - 5)*pow(part[i],0.05))) #syncopation = difference in profile weights
+                syncopation = float(syncopation + (abs(salienceProfile[i] - 5)*pow(part[i],0.2))) #syncopation = difference in profile weights
     return syncopation
 
 def getDensity(part):
@@ -137,7 +146,7 @@ def getDensity(part):
     averageVelocity = np.mean(np.nonzero(part))
     if np.isnan(averageVelocity):
         averageVelocity = 0.0
-    density = pow(averageVelocity,0.05) * float(numOnsets)/float(numSteps)
+    density = pow(averageVelocity,0.2) * float(numOnsets)/float(numSteps)
     return density
 
 def splitKitParts3Ways(groove):
@@ -165,20 +174,20 @@ def getWitekSyncopationDistance(A,B):
     binaryA = np.ceil(A)
     binaryB = np.ceil(B)
 
-    lowA, midA, highA = splitKitParts3Ways(binaryA)
-    lowB, midB, highB = splitKitParts3Ways(binaryB)
+    lowA, midA, highA = splitKitParts3Ways(A)
+    lowB, midB, highB = splitKitParts3Ways(B)
     totalSyncopation = 0
     totalSyncopation = 0
 
     for i in range(len(lowA)):
         kickSync = findKickSync(lowA, midA, highA, i, salienceProfile)
-        snareSync = findKickSync(lowA, midA, highA, i, salienceProfile)
+        snareSync = findSnareSync(lowA, midA, highA, i, salienceProfile)
         totalSyncopation += kickSync
         totalSyncopation += snareSync
 
     for i in range(len(lowB)):
         kickSync = findKickSync(lowB, midB, highB, i, salienceProfile)
-        snareSync = findKickSync(lowB, midB, highB, i, salienceProfile)
+        snareSync = findSnareSync(lowB, midB, highB, i, salienceProfile)
         totalSyncopation += kickSync
         totalSyncopation += snareSync
     return totalSyncopation
@@ -187,42 +196,43 @@ def findKickSync(low, mid, high, i, salienceProfile):
     # find instances  when kick syncopates against hi hat/snare on the beat. looking for kick proceeded by another hit
     # on a weaker metrical position
     kickSync = 0
-    if low[i] == 1.0:
-        if high[(i+1)%32] == 1.0 and mid[(i+1)%32] == 1.0:
+    if low[i] != 0.0:
+        if high[(i+1)%32] != 0.0 and mid[(i+1)%32] != 0.0:
             if salienceProfile[i+1] > salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
-                kickSync = 2
-        elif mid[(i+1)%32] == 1.0:
+                kickSync = 2.0 * pow(low[i],0.2)
+        elif mid[(i+1)%32] != 0.0:
             if salienceProfile[i + 1] > salienceProfile[i]: #my own estimate - more syncopated that hi hat on pulse too (?)
-                kickSync = 3
-        elif high[(i+1)%32] == 1.0:
+                kickSync = 3.0 * pow(low[i],0.2)
+        elif high[(i+1)%32] != 0.0:
             if salienceProfile[i + 1] > salienceProfile[i]:
-                kickSync = 5
+                kickSync = 5.0 * pow(low[i],0.2)
     return kickSync
 
 def findSnareSync(low, mid, high, i, salienceProfile):
     # find instances  when snare syncopates against hi hat/kick on the beat
     snareSync = 0
-    if mid[i] == 1.0:
-        if high[(i+1)%32] == 1.0 and low[(i+1)%32] == 1.0:
+    if mid[i] != 0.0:
+        if high[(i+1)%32] != 0.0 and low[(i+1)%32] != 0.0:
             if salienceProfile[i + 1] > salienceProfile[i]:
-                snareSync = 1
-        elif high[(i+1)%32] == 1.0:
+                snareSync = 1.0 * pow(mid[i],0.2)
+        elif high[(i+1)%32] != 0.0:
             if salienceProfile[i+1] > salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
-                snareSync = 5
-        elif low[(i+1)%32] == 1.0:
+                snareSync = 5.0 * pow(mid[i],0.2)
+        elif low[(i+1)%32] != 0.0:
             if salienceProfile[i + 1] > salienceProfile[i]: # my best guess - kick without hi hat
-                snareSync = 1
+                snareSync = 1.0 * pow(mid[i],0.2)
+    print(snareSync)
     return snareSync
 
 def findHiHatSync(low, mid, high, i, salienceProfile):
     # find instances  when hiaht syncopates against snare/kick on the beat. this is my own adaptation of Witek 2014
     # may or may not work. currently doesn't consider velocity or open hi hats
     hihatSync = 0
-    if high[i] == 1.0:
-        if low[(i+1)%32] == 1.0:
+    if high[i] != 0.0:
+        if low[(i+1)%32] != 0.0:
             if salienceProfile[i+1] > salienceProfile[i]:
                 hihatSync = 1 ### bit of a guess - maybe should be 0.5?
-        elif mid[(i+1)%32] == 1.0:
+        elif mid[(i+1)%32] != 0.0:
             if salienceProfile[i + 1] > salienceProfile[i]:
                 hihatSync =1 ### another guess
     return hihatSync
@@ -241,7 +251,7 @@ def getPanteliFeatures(A):
 
     #symmetry: number of onsets in the same position for bars 1 and 2
     binaryA = np.ceil(A)
-    low,mid,high = splitKitParts3Ways(binaryA)
+    low,mid,high = splitKitParts3Ways(A)
     lowSym = getSymmetry1Part(low)
     midSym = getSymmetry1Part(mid)
     highSym = getSymmetry1Part(high)
@@ -265,9 +275,11 @@ def getPanteliFeatures(A):
     autoCorrelationCentroid = getCentroid(autoCorrelationSum)
     harmonicity = getHarmonicity(autoCorrelationSum)
 
-    weighting = np.array([0.61,0.38,0.31,0.15,0.07,0.0])
+
+    weighting = np.array([0.5,0.48,0.31,0.15,0.7,6.0])
     panteliFeatureSet = np.multiply(weighting,np.array([autoCorrelationSkew,autoCorrelationMaxAmplitude,autoCorrelationCentroid,
                                                 averageSync,harmonicity,averageSymmetry]))
+    #print(panteliFeatureSet)
     return np.nan_to_num(panteliFeatureSet)
 
 def getHarmonicity(part):
@@ -285,7 +297,7 @@ def getHarmonicity(part):
         remainder1 = 16%peaks[i]
         #remainder2 = 16%peaks[i]
         if remainder1 > 16*0.15 and remainder1 < 16*0.85:
-            inharmonicSum += part[peaks[i]-1] #add magnitude of inharmonic peaks
+            inharmonicSum += pow(part[peaks[i]-1],0.2) #add magnitude of inharmonic peaks
             inharmonicPeaks.append(part[i])
 
     harmonicity = math.exp((-0.25*len(peaks)*inharmonicSum/float(part.max())))
@@ -297,6 +309,7 @@ def getCentroid(part):
     # remove negative periodicities - not relevant and give a - answer which is weird and unhelpful.
     centroidSum = 0
     totalWeights = 0
+    part = np.power(part, 0.2)
     for i in range(len(part)):
         addition = part[i]*i
         if addition >= 0:
@@ -327,12 +340,12 @@ def getAutocorrelation(part):
     return autocorrelation
 
 def getSymmetry1Part(part):
-    sym = 0
+    sym = 0.0
     part1 = part[0:16]
     part2 = part[16:32]
     for i in range(16):
         if part1[i] != 0 and part2[i] != 0:
-            sym +=1
+            sym += abs(pow(part1[i],0.2)-pow(part2[i],0.2))
     return sym
 
 allEuclideanDistances = []

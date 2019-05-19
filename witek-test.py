@@ -42,7 +42,7 @@ def findSnareSync(low, mid, high, i, salienceProfile):
     snareSync = 0
     nextHit = ""
     if mid[i] == 1.0 and mid[(i+1)%32] != 1.0:
-        print(i)
+
         for j in range(i+1, i+len(mid)):
             if mid[(j%32)] == 1.0:
                 nextHit = "Mid"
@@ -137,7 +137,7 @@ def testSync(kick,snare, hihat):
                        0, -3, -2, -3, -1, -3, -2, -3, -1, -3, -2, -3, -1, -3, -2, -3]
     totalSyncopation = 0
     for i in range(len(hihatRhythm)):
-        print(i)
+        #print(i)
         kickSync = findKickSync(kick, snare, hihat, i, salienceProfile)
         snareSync = findSnareSync(kick, snare, hihat, i, salienceProfile)
         totalSyncopation += kickSync
