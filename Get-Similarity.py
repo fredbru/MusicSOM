@@ -2,6 +2,8 @@ import numpy as np
 from matplotlib import pyplot as plt
 import math
 import editdistance
+from scipy import stats
+from scipy.signal import find_peaks
 
 
 def getEuclideanDistance(A, B):
@@ -116,14 +118,14 @@ def getWitekSyncopationDistance(A,B):
         snareSync = findKickSync(lowA, midA, highA, i, salienceProfile)
         totalSyncopation += kickSync
         totalSyncopation += snareSync
-        print(totalSyncopation)
+        #print(totalSyncopation)
 
     for i in range(len(lowB)):
         kickSync = findKickSync(lowB, midB, highB, i, salienceProfile)
         snareSync = findKickSync(lowB, midB, highB, i, salienceProfile)
         totalSyncopation += kickSync
         totalSyncopation += snareSync
-        print(totalSyncopation)
+        #print(totalSyncopation)
     return totalSyncopation
 
 def findKickSync(low, mid, high, i, salienceProfile):
@@ -232,26 +234,17 @@ def getPanteliFeatures(A):
     highC = getAutocorrelation(high)
 
     autoCorrelationSum = (lowC+midC+highC)/3.0
+
     autoCorrelationMaxAmplitude = autoCorrelationSum.max() #max, summed and scaled between 0 and 1
-    #print("Max Amplitude" + str(autoCorrelationMaxAmplitude))
-
-    from scipy import stats
     autoCorrelationSkew = stats.skew(autoCorrelationSum)
-
-    # import pandas as pd
-    # print(pd.DataFrame(lowC).skew(axis=0))
-    # print(pd.DataFrame(midC).skew(axis=0))
-    # print(pd.DataFrame(highC).skew(axis=0))
-
-    #centroid
     autoCorrelationCentroid = getCentroid(autoCorrelationSum)
+    harmonicity = getHarmonicity(autoCorrelationSum)
 
-    #harmonicity
-    # find peaks. Measures whether periodicities occur in harmonic relation to the beat (feature value = 1) or
-    # inharmonic (feature value = 0)
-    print(getHarmonicity(midC))
-    #print(getHarmonicity(highC))
-
+    weighting = np.array([0.61,0.38,0.31,0.15,0.07,0.06])
+    panteliFeatureSet = np.multiply(weighting,np.array([autoCorrelationSkew,autoCorrelationMaxAmplitude,autoCorrelationCentroid,
+                                                averageSync,harmonicity,averageSymmetry]))
+    print(panteliFeatureSet)
+    return panteliFeatureSet
 
 
 def getHarmonicity(part):
@@ -261,7 +254,6 @@ def getHarmonicity(part):
     for i in range(len(part)):
         if part[i] < 0:
             part[i]=0
-    from scipy.signal import find_peaks
     peaks = np.asarray(find_peaks(part)) #weird syntax due to 2.x/3.x compatibility issues here
     peaks = peaks[0] + 1#peaks = lags
     inharmonicSum = 0.0
@@ -310,7 +302,7 @@ def getAutocorrelation(part):
     ax = autocorrelation_plot(part)
     autocorrelation = ax.lines[5].get_data()[1]
     plt.plot(range(1,33),autocorrelation) #plots from 1 to 32 inclusive - autocorrelation starts from 1 not 0 - 1-32
-    plt.show()
+    #plt.show()
     return autocorrelation
 
 def getSymmetry1Part(part):
