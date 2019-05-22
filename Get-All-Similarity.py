@@ -169,59 +169,110 @@ def getWitekSyncopationDistance(A,B):
     # types with 3 kit parts. Later look at implementing 4 parts: add open hi hat, and syncopation with hi hat off pulse
     # then look at adding velocity somehow (use velocity of syncopating part?)
 
-    salienceProfile = [0,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3,
-                       0,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3,-1,-3,-2,-3,0]
+    salienceProfile = [0, -3, -2, -3, -1, -3, -2, -3, -1, -3, -2, -3, -1, -3, -2, -3,
+                       0, -3, -2, -3, -1, -3, -2, -3, -1, -3, -2, -3, -1, -3, -2, -3]
     binaryA = np.ceil(A)
     binaryB = np.ceil(B)
 
-    lowA, midA, highA = splitKitParts3Ways(A)
-    lowB, midB, highB = splitKitParts3Ways(B)
-    totalSyncopation = 0
-    totalSyncopation = 0
+    lowA, midA, highA = splitKitParts3Ways(binaryA)
+    lowB, midB, highB = splitKitParts3Ways(binaryB)
+
+    totalSyncopationA = 0
+    totalSyncopationB = 0
 
     for i in range(len(lowA)):
         kickSync = findKickSync(lowA, midA, highA, i, salienceProfile)
         snareSync = findSnareSync(lowA, midA, highA, i, salienceProfile)
-        totalSyncopation += kickSync
-        totalSyncopation += snareSync
+        totalSyncopationA += kickSync
+        totalSyncopationA += snareSync
 
     for i in range(len(lowB)):
         kickSync = findKickSync(lowB, midB, highB, i, salienceProfile)
         snareSync = findSnareSync(lowB, midB, highB, i, salienceProfile)
-        totalSyncopation += kickSync
-        totalSyncopation += snareSync
-    return totalSyncopation
+        totalSyncopationB += kickSync
+        totalSyncopationB += snareSync
+    return abs(totalSyncopationA-totalSyncopationB)
 
 def findKickSync(low, mid, high, i, salienceProfile):
     # find instances  when kick syncopates against hi hat/snare on the beat. looking for kick proceeded by another hit
     # on a weaker metrical position
     kickSync = 0
-    if low[i] != 0.0:
-        if high[(i+1)%32] != 0.0 and mid[(i+1)%32] != 0.0:
-            if salienceProfile[i+1] > salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
-                kickSync = 2.0 * pow(low[i],0.2)
-        elif mid[(i+1)%32] != 0.0:
-            if salienceProfile[i + 1] > salienceProfile[i]: #my own estimate - more syncopated that hi hat on pulse too (?)
-                kickSync = 3.0 * pow(low[i],0.2)
-        elif high[(i+1)%32] != 0.0:
-            if salienceProfile[i + 1] > salienceProfile[i]:
-                kickSync = 5.0 * pow(low[i],0.2)
+    k = 0
+    nextHit = ""
+    if low[i] == 1 and low[(i+1)%32] != 1:
+        for j in range(i+1, i+len(low)):
+            if low[(j%32)] == 1:
+                nextHit = "Kick"
+                k = j%32
+                break
+            elif mid[(j%32)] == 1 and high[(j%32)] != 1:
+                nextHit = "Mid"
+                k = j%32
+                break
+            elif high[(j%32)] == 1 and mid[(j%32)] != 1:
+                nextHit = "High"
+                k = j%32
+                break
+            elif high[(j%32)] == 1 and mid[(j%32)] == 1:
+                nextHit = "MidAndHigh"
+                k = j%32
+                break
+        if nextHit == "MidAndHigh":
+            if salienceProfile[k] >= salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
+                difference = salienceProfile[i] - salienceProfile[k]
+                kickSync = difference + 2
+                print("mid high sync")
+        elif nextHit == "Mid":
+            if salienceProfile[k] >= salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
+                difference = salienceProfile[i] - salienceProfile[k]
+                kickSync = difference + 2
+                print("mid sync")
+        elif nextHit == "High":
+            if salienceProfile[k] >= salienceProfile[i]:
+                difference = salienceProfile[i] - salienceProfile[k]
+                kickSync = difference + 5
+                print("low sync")
     return kickSync
 
 def findSnareSync(low, mid, high, i, salienceProfile):
     # find instances  when snare syncopates against hi hat/kick on the beat
+    # S = n - ndi + I
     snareSync = 0
-    if mid[i] != 0.0:
-        if high[(i+1)%32] != 0.0 and low[(i+1)%32] != 0.0:
-            if salienceProfile[i + 1] > salienceProfile[i]:
-                snareSync = 1.0 * pow(mid[i],0.2)
-        elif high[(i+1)%32] != 0.0:
-            if salienceProfile[i+1] > salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
-                snareSync = 5.0 * pow(mid[i],0.2)
-        elif low[(i+1)%32] != 0.0:
-            if salienceProfile[i + 1] > salienceProfile[i]: # my best guess - kick without hi hat
-                snareSync = 1.0 * pow(mid[i],0.2)
-    print(snareSync)
+    nextHit = ""
+    k=0
+    if mid[i] == 1 and mid[(i+1)%32] != 1:
+        for j in range(i+1, i+len(mid)):
+            if mid[(j%32)] == 1:
+                nextHit = "Mid"
+                k = j%32
+                break
+            elif low[(j%32)] == 1 and high[(j%32)] != 1:
+                nextHit = "Low"
+                k = j%32
+                break
+            elif high[(j%32)] == 1 and low[(j%32)] != 1:
+                nextHit = "High"
+                k = j%32
+                break
+            elif high[(j%32)] == 1 and low[(j%32)] == 1:
+                nextHit = "LowAndHigh"
+                k = j%32
+                break
+        if nextHit == "LowAndHigh":
+            if salienceProfile[k] >= salienceProfile[i]:
+                difference = salienceProfile[i] - salienceProfile[k]
+                snareSync = difference + 1
+                print("low high sync")
+        elif nextHit == "Low":
+            if salienceProfile[k] >= salienceProfile[i]:
+                difference = salienceProfile[i] - salienceProfile[k]
+                snareSync = difference + 1
+                print("low snare sync")
+        elif nextHit == "High":
+            if salienceProfile[k] >= salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
+                difference = salienceProfile[i] - salienceProfile[k]
+                snareSync = difference + 5
+                print("high sync snare")
     return snareSync
 
 def findHiHatSync(low, mid, high, i, salienceProfile):
