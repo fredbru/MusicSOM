@@ -12,7 +12,7 @@ from matplotlib import pyplot as plt
 # round ratings
 # 10 levels: 0,1,2,3,4,5,6,7,8,9. 0 = 0 similarity, 9=perfect or near perfect
 
-ratingFiles = os.listdir('/home/fred/BFD/python/MusicSOM/ratings')
+ratingFiles = os.listdir('/home/fred/BFD/python/MusicSOM/Ratings-by-participant-reliable')
 
 ratingFiles.sort() #alphabetize
 ratingFiles = ratingFiles[10:90]
@@ -20,8 +20,8 @@ scoresByPair = np.zeros([80,21])
 
 def getResultsPerPair(scoresByPair):
     # tested, works
-    for i in range(80): #just non-repeated ones
-        with open(('/home/fred/BFD/python/MusicSOM/ratings/' + ratingFiles[i])) as csvfile:
+    for i in range(21): #just non-repeated ones
+        with open(('/home/fred/BFD/python/MusicSOM/Ratings-by-participant-reliable/' + ratingFiles[i])) as csvfile:
             reader = csv.reader(csvfile, delimiter=",") #so far 21 participants
             j = 0
             for row in reader:
@@ -30,7 +30,7 @@ def getResultsPerPair(scoresByPair):
                 elif row[0] == "file_keys":
                     pass
                 elif j < 21:
-                    scoresByPair[i,j] = row[1]
+                    scoresByPair[i,j] = row[0]
                     j+=1
     return scoresByPair
 

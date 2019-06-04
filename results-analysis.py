@@ -11,15 +11,15 @@ from scipy import stats
 # round ratings
 # 10 levels: 0,1,2,3,4,5,6,7,8,9. 0 = 0 similarity, 9=perfect or near perfect
 
-ratingFiles = os.listdir('/home/fred/BFD/python/MusicSOM/ratings')
+ratingFiles = os.listdir('/home/fred/BFD/python/MusicSOM/ratings-new')
 
 ratingFiles.sort() #alphabetize
 
-scoresByPair = np.zeros([90,21])
+scoresByPair = np.zeros([90,23])
 def getResultsPerPair(scoresByPair):
     # tested, works
     for i in range(90):
-        with open(('/home/fred/BFD/python/MusicSOM/ratings/' + ratingFiles[i])) as csvfile:
+        with open(('/home/fred/BFD/python/MusicSOM/ratings-new/' + ratingFiles[i])) as csvfile:
             reader = csv.reader(csvfile, delimiter=",") #so far 21 participants
             j = 0
             for row in reader:
@@ -27,14 +27,14 @@ def getResultsPerPair(scoresByPair):
                     pass
                 elif row[0] == "file_keys":
                     pass
-                elif j < 21:
+                elif j < 23:
                     scoresByPair[i,j] = row[1]
                     j+=1
     return scoresByPair
 
 def getRepeatedPairs(subject):
-    first10 = np.round(subject[0:10] *10.0)+1
-    last10 = np.round(subject[80:90] *10.0)+1
+    first10 = subject[0:10]
+    last10 = subject[80:90]
     return np.vstack([first10,last10])
 
 scoresBySubject = getResultsPerPair(scoresByPair).T
@@ -102,15 +102,16 @@ def fleiss_kappa2(s):
 #     kappa = sklearn.metrics.cohen_kappa_score(first10, last10)
 #     print(kappa)
 
-for i in range(21):
-    nameStr = "Participant-" + str(i) +"-7point.csv"
-    s = np.round(scoresBySubject[i] * 6)
-    #print(s)
+for i in range(23):
+    nameStr = "Participant-" + str(i) +"-New.csv"
+    s = scoresBySubject[i]
+    print(s)
     first10 = s[0:10]
     last10 = s[80:90]
     import sklearn.metrics
-    kappa = sklearn.metrics.cohen_kappa_score(first10, last10)
-    print(kappa)
-    if kappa > 0.2:
-        np.savetxt(nameStr, s[10:90], delimiter=",",fmt='%i')
+    #kappa = sklearn.metrics.cohen_kappa_score(first10, last10)
+    np.savetxt(nameStr, s[10:90], delimiter=",", fmt='%f')
+    # if kappa > 0.2:
+    #     np.savetxt(nameStr, s[10:90], delimiter=",",fmt='%i')
+    #     #print(kappa)
 

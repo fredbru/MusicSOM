@@ -26,7 +26,7 @@ def getEuclideanRhythmDistance(a, b):
     lB,mB,hB = splitKitParts3Ways(b)
     b = np.hstack([lB,mB,hB])
 
-    x = (np.power(a,1.0/5.0).flatten()-np.power(b,1.0/5.0).flatten())
+    x = (np.power(a,1).flatten()-np.power(b,1).flatten())
     return math.sqrt(np.dot(x, x.T))
 
 def getHammingDistance(a, b):
@@ -95,7 +95,6 @@ def getGomezFeatureDistance(A,B):
     losync_A = getSyncopation(lowAV)
     losync_B = getSyncopation(lowBV)
 
-
     midD_A = getDensity(midAV)
     midD_B = getDensity(midBV)
 
@@ -136,7 +135,7 @@ def getSyncopation(part):
     for i in range(len(part)):
         if part[i] != 0:
             if part[(i+1)%32] == 0.0: #only syncopation when not followed immediately by another onset
-                syncopation = float(syncopation + (abs(salienceProfile[i] - 5)*pow(part[i],0.2))) #syncopation = difference in profile weights
+                syncopation = float(syncopation + (abs(salienceProfile[i] - 5)*pow(part[i],1))) #syncopation = difference in profile weights
     return syncopation
 
 def getDensity(part):
@@ -146,7 +145,7 @@ def getDensity(part):
     averageVelocity = np.mean(np.nonzero(part))
     if np.isnan(averageVelocity):
         averageVelocity = 0.0
-    density = pow(averageVelocity,0.2) * float(numOnsets)/float(numSteps)
+    density = pow(averageVelocity,1) * float(numOnsets)/float(numSteps)
     return density
 
 def splitKitParts3Ways(groove):
@@ -180,17 +179,20 @@ def getWitekSyncopationDistance(A,B):
     totalSyncopationA = 0
     totalSyncopationB = 0
 
+    high = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0,
+                   1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0]
+
     for i in range(len(lowA)):
         kickSync = findKickSync(lowA, midA, highA, i, salienceProfile)
         snareSync = findSnareSync(lowA, midA, highA, i, salienceProfile)
-        totalSyncopationA += kickSync
-        totalSyncopationA += snareSync
+        totalSyncopationA += kickSync*lowA[i]
+        totalSyncopationA += snareSync*midA[i]
 
     for i in range(len(lowB)):
         kickSync = findKickSync(lowB, midB, highB, i, salienceProfile)
         snareSync = findSnareSync(lowB, midB, highB, i, salienceProfile)
-        totalSyncopationB += kickSync
-        totalSyncopationB += snareSync
+        totalSyncopationB += kickSync*lowB[i]
+        totalSyncopationB += snareSync*midB[i]
     return abs(totalSyncopationA-totalSyncopationB)
 
 def findKickSync(low, mid, high, i, salienceProfile):
@@ -201,8 +203,12 @@ def findKickSync(low, mid, high, i, salienceProfile):
     nextHit = ""
     if low[i] == 1 and low[(i+1)%32] != 1:
         for j in range(i+1, i+len(low)):
-            if low[(j%32)] == 1:
-                nextHit = "Kick"
+            if low[(j%32)] == 1 and high[(j%32)] == 1:
+                nextHit = "LowAndHigh"
+                k = j%32
+                break
+            elif low[(j%32)] == 1 and high[(j%32)] != 1:
+                nextHit = "Low"
                 k = j%32
                 break
             elif mid[(j%32)] == 1 and high[(j%32)] != 1:
@@ -217,21 +223,24 @@ def findKickSync(low, mid, high, i, salienceProfile):
                 nextHit = "MidAndHigh"
                 k = j%32
                 break
-        if nextHit == "MidAndHigh":
+        if nextHit == "LowAndHigh":
+            if salienceProfile[k] >= salienceProfile[i]:
+                difference = salienceProfile[k] - salienceProfile[i]
+                kickSync = difference + 2 #1 or 2?
+        elif nextHit == "MidAndHigh":
             if salienceProfile[k] >= salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
-                difference = salienceProfile[i] - salienceProfile[k]
+                difference = salienceProfile[k] - salienceProfile[i]
                 kickSync = difference + 2
-                print("mid high sync")
         elif nextHit == "Mid":
             if salienceProfile[k] >= salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
-                difference = salienceProfile[i] - salienceProfile[k]
+                difference = salienceProfile[k] - salienceProfile[i]
                 kickSync = difference + 2
-                print("mid sync")
         elif nextHit == "High":
             if salienceProfile[k] >= salienceProfile[i]:
-                difference = salienceProfile[i] - salienceProfile[k]
+                difference = salienceProfile[k] - salienceProfile[i]
                 kickSync = difference + 5
-                print("low sync")
+    # if kickSync != 0:
+    #     print("kick sync", kickSync)
     return kickSync
 
 def findSnareSync(low, mid, high, i, salienceProfile):
@@ -242,7 +251,7 @@ def findSnareSync(low, mid, high, i, salienceProfile):
     k=0
     if mid[i] == 1 and mid[(i+1)%32] != 1:
         for j in range(i+1, i+len(mid)):
-            if mid[(j%32)] == 1:
+            if mid[(j%32)] == 1 and high[(j%32)] != 1:
                 nextHit = "Mid"
                 k = j%32
                 break
@@ -258,21 +267,26 @@ def findSnareSync(low, mid, high, i, salienceProfile):
                 nextHit = "LowAndHigh"
                 k = j%32
                 break
+            elif high[(j%32)] == 1 and mid[(j%32)] == 1:
+                nextHit = "MidAndHigh"
+                k = j%32
+                break
         if nextHit == "LowAndHigh":
             if salienceProfile[k] >= salienceProfile[i]:
-                difference = salienceProfile[i] - salienceProfile[k]
+                difference = salienceProfile[k] - salienceProfile[i]
+                snareSync = difference + 1 #may need to make this back to 1?)
+        elif nextHit == "MidAndHigh":
+            if salienceProfile[k] >= salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
+                difference = salienceProfile[k] - salienceProfile[i]
                 snareSync = difference + 1
-                print("low high sync")
         elif nextHit == "Low":
             if salienceProfile[k] >= salienceProfile[i]:
-                difference = salienceProfile[i] - salienceProfile[k]
+                difference = salienceProfile[k] - salienceProfile[i]
                 snareSync = difference + 1
-                print("low snare sync")
         elif nextHit == "High":
             if salienceProfile[k] >= salienceProfile[i]: #if hi hat is on a stronger beat - syncopation
-                difference = salienceProfile[i] - salienceProfile[k]
+                difference = salienceProfile[k] - salienceProfile[i]
                 snareSync = difference + 5
-                print("high sync snare")
     return snareSync
 
 def findHiHatSync(low, mid, high, i, salienceProfile):
@@ -304,9 +318,12 @@ def getPanteliFeatures(A):
     binaryA = np.ceil(A)
     low,mid,high = splitKitParts3Ways(A)
     lowSym = getSymmetry1Part(low)
+
     midSym = getSymmetry1Part(mid)
+
     highSym = getSymmetry1Part(high)
-    averageSymmetry = (lowSym + midSym + highSym)/3.0 #this works
+
+    averageSymmetry = float(lowSym + midSym + highSym)/3.0 #this works
 
     #syncopation - same as Gomez, using velocity though
     lowSync = getSyncopation(low)
@@ -332,6 +349,31 @@ def getPanteliFeatures(A):
                                                 averageSync,harmonicity,averageSymmetry]))
     #print(panteliFeatureSet)
     return np.nan_to_num(panteliFeatureSet)
+def getPanteliFeaturesIndividual(a):
+    #syncopation - same as Gomez, using velocity though
+    low,mid,high = splitKitParts3Ways(a)
+    lowSync = getSyncopation(low)
+    midSync = getSyncopation(mid)
+    highSync = getSyncopation(high)
+    averageSync = (lowSync + midSync + highSync)/3.0
+
+    # autocorrelation features - sum across stream then calculate features
+    lowC = getAutocorrelation(low)
+    midC = getAutocorrelation(mid)
+    highC = getAutocorrelation(high)
+
+    lowSym = getSymmetry1Part(low)
+    midSym = getSymmetry1Part(mid)
+    highSym = getSymmetry1Part(high)
+    averageSymmetry = (lowSym + midSym + highSym)/3.0 #this works
+
+    autoCorrelationSum = (lowC+midC+highC)/3.0
+
+    autoCorrelationMaxAmplitude = autoCorrelationSum.max() #max, summed and scaled between 0 and 1
+    autoCorrelationSkew = stats.skew(autoCorrelationSum)
+    autoCorrelationCentroid = getCentroid(autoCorrelationSum)
+    harmonicity = getHarmonicity(autoCorrelationSum)
+    return autoCorrelationSkew, autoCorrelationMaxAmplitude, autoCorrelationCentroid, averageSync, harmonicity, averageSymmetry
 
 def getHarmonicity(part):
     # need to 0 out negative periodicities.
@@ -348,7 +390,7 @@ def getHarmonicity(part):
         remainder1 = 16%peaks[i]
         #remainder2 = 16%peaks[i]
         if remainder1 > 16*0.15 and remainder1 < 16*0.85:
-            inharmonicSum += pow(part[peaks[i]-1],0.2) #add magnitude of inharmonic peaks
+            inharmonicSum += pow(part[peaks[i]-1],1) #add magnitude of inharmonic peaks
             inharmonicPeaks.append(part[i])
 
     harmonicity = math.exp((-0.25*len(peaks)*inharmonicSum/float(part.max())))
@@ -360,11 +402,11 @@ def getCentroid(part):
     # remove negative periodicities - not relevant and give a - answer which is weird and unhelpful.
     centroidSum = 0
     totalWeights = 0
-    part = np.power(part, 0.2)
+    part = np.power(part, 1)
     for i in range(len(part)):
         addition = part[i]*i
         if addition >= 0:
-            totalWeights += part[i]
+            totalWeights += pow(part[i],1)
             centroidSum +=addition
     if totalWeights != 0:
         centroid = centroidSum / totalWeights
@@ -395,54 +437,10 @@ def getSymmetry1Part(part):
     part1 = part[0:16]
     part2 = part[16:32]
     for i in range(16):
-        if part1[i] != 0 and part2[i] != 0:
-            sym += abs(pow(part1[i],0.2)-pow(part2[i],0.2))
+        if part1[i] != 0.0 and part2[i] != 0.0:
+            sym += abs(pow(part1[i],1)-pow(part2[i],1))
     return sym
 
-allEuclideanDistances = []
-allHammingDistances = []
-allEditDistances = []
-allVelocityEditDistances = []
-allGomezDistances = []
-allWitekDistances = []
-allPanteliDistances = []
-j=0
-with open("/home/fred/BFD/python/Similarity-Eval/eval-pairings-reduced.csv") as csvfile:
-    reader = csv.reader(csvfile, delimiter=",")
-    for row in reader:
-        aName = row[0]
-        bName = row[1]
-        for i in range(len(allNames)):
-            if allNames[i] == aName:
-                a = allGrooves[i]
-            if allNames[i] == bName:
-                b = allGrooves[i]
-        euclideanRhythmDistance = getEuclideanRhythmDistance(a,b)
-        hammingDistance = getHammingDistance(a,b)
-        #bineditdistance = getBinaryEditDistance(a,b)
-        #velocityEditdistance = getVelocityEditDistance(a,b)
-        gomezDistance = getGomezFeatureDistance(a,b)
-        witekDistance = getWitekSyncopationDistance(a,b)
-        #panteliDistance = getPanteliFeatureDistance(a,b)
-
-        allEuclideanDistances.append(euclideanRhythmDistance)
-        allHammingDistances.append(hammingDistance)
-        # allEditDistances.append(bineditdistance)
-        # allVelocityEditDistances.append(velocityEditdistance)
-        allGomezDistances.append(gomezDistance)
-        allWitekDistances.append(witekDistance)
-        #allPanteliDistances.append(panteliDistance)
-
-        # print(aName + "  " + bName + '    Euclidean = ' + str(euclideanRhythmDistance) + "Hamming = "
-        #       + str(hammingDistance))
-        j=j+1
-
-ratingFiles = os.listdir('/home/fred/BFD/python/MusicSOM/ratings')
-
-ratingFiles.sort() #alphabetize
-ratingFiles = ratingFiles[10:90]
-scoresByPair = np.zeros([80,21])
-print(scoresByPair.shape)
 def getResultsPerPair(scoresByPair):
     # tested, works
     for i in range(80): #just non-repeated ones
@@ -464,45 +462,201 @@ def getRepeatedPairs(subject):
     last10 = np.round(subject[80:90] *10.0)+1
     return np.vstack([first10,last10])
 
+
+def getIndividualFeatureCorrelation(scoresBySubject):
+    # get distance for each individual features,
+    # features: Gomez first: low syncopation, mid density, high density, hiness, hisyness
+    # panteli: Autocorellation skewness, max amplitude, centroid, harmonicity of peaks
+    # weighted syncopation (same as Gomez but with velocity, also summed for all instruments).
+    # symmetry of metrical profile
+    allLowSync = []
+    allMidDensity = []
+    allHighDensity = []
+    allHiness = []
+    allHisyness = []
+
+    allAutoCSkew = []
+    allAutoCMaxAmplitude = []
+    allAutoCCentroid = []
+    allAutoCHarmonicity = []
+    allWeightedSyncopation = []
+    allSymmetry = []
+    with open("/home/fred/BFD/python/Similarity-Eval/eval-pairings-reduced.csv") as csvfile:
+        reader = csv.reader(csvfile, delimiter=",")
+        for row in reader:
+            aName = row[0]
+            bName = row[1]
+            for i in range(len(allNames)):
+                if allNames[i] == aName:
+                    a = allGrooves[i]
+                if allNames[i] == bName:
+                    b = allGrooves[i]
+            lowA, midA, highA = splitKitParts3Ways(a)
+            lowB, midB, highB = splitKitParts3Ways(b)
+
+            allLowSync.append(getSyncopation(lowA)-getSyncopation(lowB))
+            allMidDensity.append(getDensity(midA)-getDensity(midB))
+            hiD_A = getDensity(highA)
+            hiD_B = getDensity(highB)
+
+            allHighDensity.append(hiD_A-hiD_B)
+            hiness_A = (float(getDensity(highA)) / float(getDensity(a))) / 10.0
+            hiness_B = (float(getDensity(highB)) / float(getDensity(b))) / 10.0
+            allHiness.append(hiness_A-hiness_B)
+
+            if hiD_A != 0.:
+                hisynessA = float(getSyncopation(highA)) / float(np.count_nonzero(np.ceil(highA) == 1))
+            else:
+                hisynessA = 0
+
+            if hiD_B != 0.:
+                hisynessB = float(getSyncopation(highB)) / float(np.count_nonzero(np.ceil(highB) == 1))
+            else:
+                hisynessB = 0
+            allHisyness.append(hisynessA-hisynessB)
+
+            skewA,maxAmplitudeA,centroidA,harmonicityA, weightedSyncA,symmetryA = getPanteliFeaturesIndividual(a)
+            skewB,maxAmplitudeB,centroidB,harmonicityB, weightedSyncB,symmetryB = getPanteliFeaturesIndividual(b)
+
+            allAutoCSkew.append(skewA-skewB)
+            allAutoCMaxAmplitude.append(maxAmplitudeA - maxAmplitudeB)
+            allAutoCCentroid.append(centroidA-centroidB)
+            allAutoCHarmonicity.append(harmonicityA-harmonicityB)
+            allWeightedSyncopation.append(weightedSyncA-weightedSyncB)
+            allSymmetry.append(symmetryA-symmetryB)
+    # if math.isnan(skewA - skewB):
+    #     allAutoCSkew.append(0.0)
+    # else:
+    #     allAutoCSkew.append(skewA - skewB)
+    # if math.isnan(maxAmplitudeA - maxAmplitudeB):
+    #     allAutoCMaxAmplitude.append(0.0)
+    # else:
+    #     allAutoCMaxAmplitude.append(maxAmplitudeA - maxAmplitudeB)
+    # allAutoCCentroid.append(centroidA - centroidB)
+    # allAutoCHarmonicity.append(harmonicityA - harmonicityB)
+    # if math.isnan(weightedSyncA - weightedSyncB):
+    #     allWeightedSyncopation.append(0.0)
+    # else:
+
+    meanScores = 1.0 - np.mean(scoresBySubject, axis=0)
+    lowSyncC, lowSyncP = stats.spearmanr(meanScores,np.array(allLowSync))
+    midDC, midDP = stats.spearmanr(meanScores,np.array(allMidDensity))
+    highDC, highDP = stats.spearmanr(meanScores,np.array(allHighDensity))
+    hinessC, hinessP = stats.spearmanr(meanScores,np.array(allHiness))
+    hisynessC, hisynessP = stats.spearmanr(meanScores,np.array(allHisyness))
+
+    skewC, skewP = stats.spearmanr(meanScores,np.nan_to_num(np.array(allAutoCSkew)))
+    maxAC, maxAP = stats.spearmanr(meanScores,np.nan_to_num(np.array(allAutoCMaxAmplitude)))
+    centroidC, centroidP = stats.spearmanr(meanScores,np.array(allAutoCCentroid))
+    harmonicityC, harmonicityP = stats.spearmanr(meanScores,np.nan_to_num(np.array(allAutoCHarmonicity)))
+    weightedSyncC, weightedSyncP = stats.spearmanr(meanScores,np.nan_to_num(np.array(allWeightedSyncopation)))
+    symmetryC, symmetryP = stats.spearmanr(meanScores,np.nan_to_num(np.array(allSymmetry)))
+
+    print("Low Sync Correlation: ", lowSyncC, lowSyncP)
+    print("Mid Density Correlation: ", midDC, midDP)
+    print("High Density Correlation: ", highDC, highDP)
+    print("Hiness Correlation: ", hinessC, hinessP)
+    print("Hisyness Correlation: ", hisynessC, hisynessP)
+    print("Skew Correlation: ", skewC, skewP)
+    print("Max Amplitude Correlation: ", maxAC, maxAP)
+    print("Centroid Correlation: ", centroidC, centroidP)
+    print("Harmonicty Correlation: ", harmonicityC, harmonicityP)
+    print("Weighted Syncopation Correlation: ", weightedSyncC, weightedSyncP)
+    print("Symmetry Correlation: ", symmetryC, symmetryP)
+
+def getModelCorrelation(scoresByPair):
+    allEuclideanDistances = []
+    allHammingDistances = []
+    allEditDistances = []
+    allVelocityEditDistances = []
+    allGomezDistances = []
+    allWitekDistances = []
+    allPanteliDistances = []
+    j=0
+    with open("/home/fred/BFD/python/Similarity-Eval/eval-pairings-reduced.csv") as csvfile:
+        reader = csv.reader(csvfile, delimiter=",")
+        for row in reader:
+            aName = row[0]
+            bName = row[1]
+            for i in range(len(allNames)):
+                if allNames[i] == aName:
+                    a = allGrooves[i]
+                if allNames[i] == bName:
+                    b = allGrooves[i]
+            euclideanRhythmDistance = getEuclideanRhythmDistance(a,b)
+            hammingDistance = getHammingDistance(a,b)
+            #bineditdistance = getBinaryEditDistance(a,b)
+            #velocityEditdistance = getVelocityEditDistance(a,b)
+            gomezDistance = getGomezFeatureDistance(a,b)
+            witekDistance = getWitekSyncopationDistance(a,b)
+            panteliDistance = getPanteliFeatureDistance(a,b)
+
+            allEuclideanDistances.append(euclideanRhythmDistance)
+            allHammingDistances.append(hammingDistance)
+            # allEditDistances.append(bineditdistance)
+            # allVelocityEditDistances.append(velocityEditdistance)
+            allGomezDistances.append(gomezDistance)
+            allWitekDistances.append(witekDistance)
+            allPanteliDistances.append(panteliDistance)
+
+            # print(aName + "  " + bName + '    Euclidean = ' + str(euclideanRhythmDistance) + "Hamming = "
+            #       + str(hammingDistance))
+            j=j+1
+
+
+
+
+    # plt.figure()
+    # plt.bar(np.arange(80),np.mean(scoresBySubject, axis=0))
+    #
+    # plt.figure()
+    # plt.hold(True)
+    # plt.bar(np.arange(80),allEuclideanDistances)
+    # plt.title("Euclidean Distances")
+    #
+    # plt.figure()
+    # plt.bar(np.arange(80),allHammingDistances)
+    # plt.title("Hamming Distances")
+    #
+    # plt.figure()
+    # plt.bar(np.arange(80),allGomezDistances)
+    # plt.title("Gomez Feature Distances")
+    #
+    # plt.figure()
+    # plt.bar(np.arange(80),allWitekDistances)
+    # plt.title("Witek Feature Distances")
+    #
+    # plt.figure()
+    # plt.bar(np.arange(80),allPanteliDistances)
+    # plt.title("Panteli Feature Distances")
+
+    coeff1, p1 = stats.spearmanr(meanScores,np.array(allHammingDistances))
+    coeff2, p2 = stats.spearmanr(meanScores,np.array(allEuclideanDistances))
+    coeff3, p3 = stats.spearmanr(meanScores,np.array(allPanteliDistances))
+    coeff4, p4 = stats.spearmanr(meanScores,np.array(allWitekDistances))
+    coeff5, p5 = stats.spearmanr(meanScores,np.array(allGomezDistances))
+
+    print("Hamming correlation: ", coeff1,p1)
+    print("Euclidean correlation: ", coeff2,p2)
+    print("Panteli correlation: ", coeff3,p3)
+    print("Witek correlation: ", coeff4,p4)
+    print("Gomez correlation: ",coeff5,p5)
+    #plt.show()
+
+
+ratingFiles = os.listdir('/home/fred/BFD/python/MusicSOM/ratings')
+
+ratingFiles.sort() #alphabetize
+ratingFiles = ratingFiles[10:90]
+scoresByPair = np.zeros([80,21])
+
 scoresBySubject = getResultsPerPair(scoresByPair).T
-# plt.figure()
-# plt.bar(np.arange(80),np.mean(scoresBySubject, axis=0))
-#
-# plt.figure()
-# plt.hold(True)
-# plt.bar(np.arange(80),allEuclideanDistances)
-# plt.title("Euclidean Distances")
-#
-# plt.figure()
-# plt.bar(np.arange(80),allHammingDistances)
-# plt.title("Hamming Distances")
-
 meanScores = 1.0 - np.mean(scoresBySubject, axis=0)
-print(np.array(allHammingDistances).shape)
-print(np.array(allPanteliDistances).shape)
-coeff1, p1 = stats.spearmanr(meanScores,np.array(allHammingDistances))
-coeff2, p2 = stats.spearmanr(meanScores,np.array(allEuclideanDistances))
-#coeff3, p3 = stats.spearmanr(meanScores,np.array(allPanteliDistances))
-coeff4, p4 = stats.spearmanr(meanScores,np.array(allWitekDistances))
-coeff5, p5 = stats.spearmanr(meanScores,np.array(allGomezDistances))
 
-print("Hamming correlation: ", coeff1,p1)
-print("Euclidean correlation: ", coeff2,p2)
-#print("Panteli correlation: ", coeff3,p3)
-print("Witek correlation: ", coeff4,p4)
-print("Gomez correlation: ",coeff5,p5)
+getModelCorrelation(scoresBySubject)
 
 
-# plt.figure()
-# plt.bar(np.arange(80),allGomezDistances)
-# plt.title("Gomez Feature Distances")
-#
-# plt.figure()
-# plt.bar(np.arange(80),allWitekDistances)
-# plt.title("Witek Feature Distances")
-#
-# plt.figure()
-# plt.bar(np.arange(80),allPanteliDistances)
-# plt.title("Panteli Feature Distances")
 
-plt.show()
+
+
+
