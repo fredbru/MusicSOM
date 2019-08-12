@@ -298,7 +298,7 @@ print(allGrooveNames[51],flatAllPaletteNames[51])
 
 # for i in range(len(allGrooveNames)):
 #     print(allGrooveNames[i], paletteNames[i])
-np.save("Eval-features.npy", grooveFeatures)
-np.save("Eval-matricies.npy", grooveMatricies)
-np.save("Eval-names.npy", allGrooveNames)
-np.save("Eval-palette-names.npy", flatAllPaletteNames)
+#np.save("Eval-features.npy", grooveFeatures)
+#np.save("Eval-matricies.npy", grooveMatricies)
+#np.save("Eval-names.npy", allGrooveNames)
+#np.save("Eval-palette-names.npy", flatAllPaletteNames)
