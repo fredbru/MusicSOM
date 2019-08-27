@@ -152,9 +152,18 @@ def getGroovesFromBundle(grooveFileName, grooveDom, evalGrooveNames, multiPalGro
                         hits = newGroove.getAudibleHits()
                         grooveArray = getCollapsedGrooveArray(hits, grooveLength)
 
-                        # round to semiquavers (0.125)
-                        grooveArray[:,1] = grooveArray[:,1]*16
-                        grooveArray[:,1] = grooveArray[:,1].round(decimals=0)/16
+
+
+                        # round to semiquavers (0.25)
+                        multipliedHit = grooveArray[:,1]*4
+
+                        roundedHit = multipliedHit.round(decimals=0)/4.0
+                        microtimingVariation = grooveArray[:, 1] - roundedHit
+                        print(roundedHit)
+
+                        grooveArray[:,1] = roundedHit
+                        print(grooveArray)
+
 
                         roundedGroove = grooveArray
                         grooveList.append(roundedGroove)
@@ -166,9 +175,17 @@ def getGroovesFromBundle(grooveFileName, grooveDom, evalGrooveNames, multiPalGro
                 hits = newGroove.getAudibleHits()
                 grooveArray = getCollapsedGrooveArray(hits, grooveLength)
 
-                # round to semiquavers (0.125)
-                grooveArray[:,1] = grooveArray[:,1]*16
-                grooveArray[:,1] = grooveArray[:,1].round(decimals=0)/16
+                # round to semiquavers (0.25)
+                multipliedHit = grooveArray[:, 1] * 4.0
+                #print(grooveArray[:, 1]) #=unquantized time positions of hits
+                roundedHit = multipliedHit.round(decimals=0) / 4.0
+                microtimingVariation = grooveArray[:, 1] - roundedHit
+                #print(newGroove.name)
+                #print("variation",microtimingVariation)
+                #print(roundedHit, grooveArray[:,1], microtimingVariation)
+
+                grooveArray[:, 1] = roundedHit
+                #print(grooveArray[:, 1])
 
                 roundedGroove = grooveArray
                 grooveList.append(roundedGroove)
@@ -199,7 +216,7 @@ def makeCollapsedBundleFeatures(groove, featureLength):
 
 def makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves):
     """
-    Generate array of feature vectors of all grooves to feed into SOM.
+    Generate array of feature vectors of all grooves to feed into SOM
     :param featureLength: length of feature vector of 1 groove - 640 for 8 parts/semiquaver
     :param numberOfBundles: number of bundles of grooves
     :param grooves: name of numpy file being used
@@ -230,6 +247,7 @@ evalList = []
 
 numberOfBundles = len(grooveFileNames)
 
+# list of all grooves which are drawn from palettes that I use a few grooves from
 multiPalGrooveList = ['Pop HH a','Pop HH a Crash','Pop HH FBar2','Pop CH1 c','Pop CH1 c Crash','Pop CH1 FBar3','Pop CH2 a','Pop CH3 a','Pop CH3 FBar3','Pop Ride1 b Crash','Pop Ride1 FBar4','Pop Ride2 b Crash',
                       'Reggae Grooves 1','Reggae Grooves 6','Reggae Grooves 7','Reggae Grooves 11','Reggae Grooves 19','Reggae Grooves 20','Reggae Grooves Fill 1','Reggae Grooves Fill 3','Reggae Grooves Fill 5',
                       'Jungle 1','Jungle 2','Jungle 3','Jungle 8','Jungle 9','Jungle 13','Jungle 14','Jungle 19','Jungle 21','Jungle Fill 1','Jungle Fill 2',
@@ -238,6 +256,7 @@ multiPalGrooveList = ['Pop HH a','Pop HH a Crash','Pop HH FBar2','Pop CH1 c','Po
                       'Funk CH1 a','Funk CH1 b','Funk CH1 c','Funk CH1 FBar1','Funk Ride a','Funk Ride FBar1','Funk CH a','Funk CH c','Funk CH d',
                       'Rock CH1 ba','Rock CH1 FBar1','Rock OH2 b','Rock OH2 FBar1', 'N Country Intro a']
 
+# list of palette names matching the above grooves
 multiPalGrooveMatchingPalettes = ['Pop V2','Pop V2','Pop V1','Pop V2','Pop V2','Pop V3','Pop V3','Pop V2','Pop V2','Pop V2','Pop V2','Pop V2',
                                   'Reggae Grooves V2','Reggae Grooves V2','Reggae Grooves V2','Reggae Grooves V2','Reggae Grooves V2','Reggae Grooves V2','Reggae Grooves V2','Reggae Grooves V2','Reggae Grooves V2',
                                   'HHM Jungle V3','HHM Jungle V1','HHM Jungle V2','HHM Jungle V2','HHM Jungle V2','HHM Jungle V1','HHM Jungle V3','HHM Jungle V1','HHM Jungle V3','HHM Jungle V2','HHM Jungle V3',
@@ -254,7 +273,7 @@ with open("/home/fred/BFD/python/Similarity-Eval/eval-grooves-list.csv") as csvf
 # in format for MusicSOM.py
 k = 0
 allPaletteNames = []
-for i in range(numberOfBundles):
+for i in range(numberOfBundles): #numberOfBundles
     #print(i)
     grooveDom = parse((path + grooveFileNames[i]))
     grooveList, bundleGrooveNames, paletteNames = getGroovesFromBundle(grooveFileNames[i][0:-8],grooveDom, evalGrooveNames, multiPalGrooveList,multiPalGrooveMatchingPalettes)
@@ -285,16 +304,17 @@ featureLength = 160 #320 - collapsed semi mode
 
 grooveFeatures, grooveMatricies = makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves)
 
-print(len(grooveFeatures))
-print(len(flatAllGrooves))
-print(len(flatAllPaletteNames))
-print(len(grooveMatricies))
+# print(len(grooveFeatures))
+# print(len(flatAllGrooves))
+# print(len(flatAllPaletteNames))
+# print(len(grooveMatricies))
 print(grooveMatricies[i].shape)
+#
+print(flatAllGrooves[0])
+# print(grooveFeatures[0])
+# print(grooveMatricies[0])
+# print(allGrooveNames[0],flatAllPaletteNames[0])
 
-print(flatAllGrooves[51])
-print(grooveFeatures[51])
-print(grooveMatricies[51])
-print(allGrooveNames[51],flatAllPaletteNames[51])
 
 # for i in range(len(allGrooveNames)):
 #     print(allGrooveNames[i], paletteNames[i])
