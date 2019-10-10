@@ -134,6 +134,7 @@ def getGroovesFromBundle(grooveFileName, grooveDom, evalGrooveNames, multiPalGro
     grooveList = []
     grooveNames=[]
     paletteNames=[]
+
     for i in range(len(grooveBundle)):
         newGroove = getGrooveFromNode(grooveBundle[i])
 
@@ -150,19 +151,20 @@ def getGroovesFromBundle(grooveFileName, grooveDom, evalGrooveNames, multiPalGro
                         #print(grooveFileName)
                         grooveLength = newGroove.lengthInBeats
                         hits = newGroove.getAudibleHits()
+
                         grooveArray = getCollapsedGrooveArray(hits, grooveLength)
 
-
-
                         # round to semiquavers (0.25)
-                        multipliedHit = grooveArray[:,1]*4
+                        multipliedHit = grooveArray[:,1]*4.0
 
                         roundedHit = multipliedHit.round(decimals=0)/4.0
                         microtimingVariation = grooveArray[:, 1] - roundedHit
-                        print(roundedHit)
+                        print(microtimingVariation[5])
+
+
 
                         grooveArray[:,1] = roundedHit
-                        print(grooveArray)
+                        #print(grooveArray)
 
 
                         roundedGroove = grooveArray
@@ -191,6 +193,7 @@ def getGroovesFromBundle(grooveFileName, grooveDom, evalGrooveNames, multiPalGro
                 grooveList.append(roundedGroove)
                 grooveNames.append(newGroove.name)
                 paletteNames.append(grooveFileName)
+
     return grooveList, grooveNames, paletteNames
 
 def makeCollapsedBundleFeatures(groove, featureLength):
