@@ -65,42 +65,88 @@ def getCollapsedGrooveArray(hits, grooveLength):
     closedHiHatArtics = {10,11,14,15,16,17,18,20,8000}
     for i in range(len(hits)):
 
-        grooveArray[i,0] = grooveLength
-        grooveArray[i,1] = hits[i].beats
-        grooveArray[i,2] = hits[i].velocity
+        grooveArray[i,0] = hits[i].beats
+        grooveArray[i,1] = hits[i].velocity
         kitPieceSlot = int(hits[i].slotIndex)
         if kitPieceSlot == kickIndex:
-            grooveArray[i,3] == 0
+            grooveArray[i,2] == 0
         if kitPieceSlot == snareIndex:
-            grooveArray[i,3] =1
+            grooveArray[i,2] =1
         # Split open and closed articulations into different categories.
         if kitPieceSlot == hihatIndex:
             if int(hits[i].articIndex) in openHiHatArtics:
-                grooveArray[i,3] = 3
+                grooveArray[i,2] = 3
             else:
-                grooveArray[i,3] = 2
+                grooveArray[i,2] = 2
         if kitPieceSlot in closedHiHatGroupIndex:
-            grooveArray[i,3] = 2
+            grooveArray[i,2] = 2
         if kitPieceSlot == crashIndex:
-            grooveArray[i,3] = 3
+            grooveArray[i,2] = 3
         if kitPieceSlot in tomGroupIndex:
-            grooveArray[i,3] = 4
+            grooveArray[i,2] = 4
     return grooveArray
 
-def getGrooveArray(hits, grooveLength):
-    """ Get groove array as combination of hits without combining kit piece parts.
-    Not recommended for generating features for SOM - collapsed features perform better in terms of mapping quality and
-    computation speed
+def getGrooveArray(hits, grooveLength, tempo):
+    """ Create groove array as combination of hits.
+    Have a seperate polyphonic line for each instrument part - including seperating open and closed
+    hi hat
+    Vector format:
+    0 Kick
+    1 snare
+    2 Closed Hihat
+    3 Open Hihat
+    4 Ride
+    5 Crash
+    6 Extra cymbal
+    7 Low tom
+    8 Mid tom
+    9 High tom
+
     :param hits:
     :param grooveLength:
     :return: grooveArray
     """
-    grooveArray = np.empty([len(hits), 4])
+    grooveArray = np.zeros([len(hits), 4])
+    openHiHatArtics = {0,1,2,3,6,7,19}
+    kickIndex = 0
+    snareIndex = 1
+    hihatIndex = 2
+    floorTomIndex = 3
+    midTomIndex = 4
+    hiTomIndex = 5
+    crashIndex = 6
+    extraCymbalIndex = 7
+    rideIndex = 8
+
+    closedHiHatArtics = {10,11,14,15,16,17,18,20,8000}
     for i in range(len(hits)):
-        grooveArray[i,0] = grooveLength
-        grooveArray[i,1] = hits[i].beats
-        grooveArray[i,2] = hits[i].velocity
-        grooveArray[i,3] = hits[i].slotIndex
+
+        grooveArray[i,0] = hits[i].beats
+        grooveArray[i,1] = hits[i].velocity
+        kitPieceSlot = int(hits[i].slotIndex)
+        if kitPieceSlot == kickIndex:
+            grooveArray[i,2] == 0
+        if kitPieceSlot == snareIndex:
+            grooveArray[i,2] =1
+        # Split open and closed articulations into different categories.
+        if kitPieceSlot == hihatIndex:
+            if int(hits[i].articIndex) in openHiHatArtics:
+                grooveArray[i,2] = 3
+            else:
+                grooveArray[i,2] = 2
+        if kitPieceSlot == rideIndex:
+            grooveArray[i,2] = 4
+        if kitPieceSlot == crashIndex:
+            grooveArray[i,2] = 5
+        if kitPieceSlot == floorTomIndex:
+            grooveArray[i,2] = 7
+        if kitPieceSlot == extraCymbalIndex:
+            grooveArray[i,2] = 6
+        if kitPieceSlot == midTomIndex:
+            grooveArray[i,2] = 8
+        if kitPieceSlot == hiTomIndex:
+            grooveArray[i,2] = 9
+
     return grooveArray
 
 def plotGroove(grooveArray):
@@ -136,7 +182,7 @@ def getGroovesFromBundle(grooveFileName, grooveDom, evalGrooveNames, multiPalGro
     paletteNames=[]
 
     for i in range(len(grooveBundle)):
-        newGroove = getGrooveFromNode(grooveBundle[i])
+        newGroove, tempo = getGrooveFromNode(grooveBundle[i])
 
         if newGroove.name in evalGrooveNames:
             for k in range(len(multiPalGrooveList)):
@@ -155,19 +201,14 @@ def getGroovesFromBundle(grooveFileName, grooveDom, evalGrooveNames, multiPalGro
                         grooveArray = getCollapsedGrooveArray(hits, grooveLength)
 
                         # round to semiquavers (0.25)
-                        multipliedHit = grooveArray[:,1]*4.0
-
-                        roundedHit = multipliedHit.round(decimals=0)/4.0
-                        microtimingVariation = grooveArray[:, 1] - roundedHit
-                        print(microtimingVariation[5])
-
-
-
-                        grooveArray[:,1] = roundedHit
-                        #print(grooveArray)
-
-
+                        multipliedHit = grooveArray[:,0]*4.0
+                        roundedHit = multipliedHit.round(decimals=0) / 4.0
+                        microtimingVariationBeats = grooveArray[:, 0] - roundedHit
+                        microtimingVariationMS = microtimingVariationBeats * 60.0 * 1000 / tempo
+                        grooveArray[:, 0] = roundedHit
+                        grooveArray[:, 3] = microtimingVariationMS
                         roundedGroove = grooveArray
+
                         grooveList.append(roundedGroove)
                         grooveNames.append(newGroove.name)
                         paletteNames.append(grooveFileName)
@@ -177,19 +218,14 @@ def getGroovesFromBundle(grooveFileName, grooveDom, evalGrooveNames, multiPalGro
                 hits = newGroove.getAudibleHits()
                 grooveArray = getCollapsedGrooveArray(hits, grooveLength)
 
-                # round to semiquavers (0.25)
-                multipliedHit = grooveArray[:, 1] * 4.0
-                #print(grooveArray[:, 1]) #=unquantized time positions of hits
+                multipliedHit = grooveArray[:, 0] * 4.0
                 roundedHit = multipliedHit.round(decimals=0) / 4.0
-                microtimingVariation = grooveArray[:, 1] - roundedHit
-                #print(newGroove.name)
-                #print("variation",microtimingVariation)
-                #print(roundedHit, grooveArray[:,1], microtimingVariation)
-
-                grooveArray[:, 1] = roundedHit
-                #print(grooveArray[:, 1])
-
+                microtimingVariationBeats = grooveArray[:, 0] - roundedHit
+                microtimingVariationMS = microtimingVariationBeats * 60.0 * 1000 / tempo
+                grooveArray[:, 0] = roundedHit
+                grooveArray[:, 3] = microtimingVariationMS
                 roundedGroove = grooveArray
+
                 grooveList.append(roundedGroove)
                 grooveNames.append(newGroove.name)
                 paletteNames.append(grooveFileName)
@@ -227,15 +263,17 @@ def makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves):
     """
     allGrooveFeatures =[]
     allGrooveMatricies =[]
+    allMicrotimingFeatures = []
     #grooveFeatures = np.empty(shape=[0, featureLength])
     print("Making features....")
     for i in range(0, len(flatAllPaletteNames)):
         #print(grooves[i])
-        features, matrix = makeCollapsedBundleFeatures(flatAllGrooves[i], featureLength)
+        features, matrix , microtiming = makeCollapsedBundleFeatures(flatAllGrooves[i], featureLength)
         #print("Completed pallete:", i)
         #allGrooveFeatures = np.vstack((grooveFeatures, features))
         allGrooveFeatures.append(features)
         allGrooveMatricies.append(matrix)
+        allMicrotimingFeatures.append(microtiming)
     return allGrooveFeatures, allGrooveMatricies
 
 np.set_printoptions(suppress=True,precision=2)
@@ -304,6 +342,7 @@ for sublist in allPaletteNames:
 
 featureLength = 160 #320 - collapsed semi mode
 #print(evalGrooveNames, "\n", allGrooveNames)
+print(flatAllGrooves)
 
 grooveFeatures, grooveMatricies = makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves)
 
