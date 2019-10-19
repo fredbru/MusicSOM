@@ -56,12 +56,16 @@ def getCollapsedGrooveArray(hits, grooveLength):
     """
     grooveArray = np.zeros([len(hits), 4])
     openHiHatArtics = {0,1,2,3,6,7,19}
-    closedHiHatGroupIndex = {6,7,8}
-    crashIndex = 6
     kickIndex = 0
     snareIndex = 1
     hihatIndex = 2
-    tomGroupIndex = {3,4,5}
+    floorTomIndex = 3
+    midTomIndex = 4
+    hiTomIndex = 5
+    crashIndex = 6
+    extraCymbalIndex = 7
+    rideIndex = 8
+
     closedHiHatArtics = {10,11,14,15,16,17,18,20,8000}
     for i in range(len(hits)):
 
@@ -78,12 +82,49 @@ def getCollapsedGrooveArray(hits, grooveLength):
                 grooveArray[i,2] = 3
             else:
                 grooveArray[i,2] = 2
-        if kitPieceSlot in closedHiHatGroupIndex:
-            grooveArray[i,2] = 2
-        if kitPieceSlot == crashIndex:
-            grooveArray[i,2] = 3
-        if kitPieceSlot in tomGroupIndex:
+        if kitPieceSlot == rideIndex:
             grooveArray[i,2] = 4
+        if kitPieceSlot == crashIndex:
+            grooveArray[i,2] = 5
+        if kitPieceSlot == floorTomIndex:
+            grooveArray[i,2] = 7
+        if kitPieceSlot == extraCymbalIndex:
+            grooveArray[i,2] = 6
+        if kitPieceSlot == midTomIndex:
+            grooveArray[i,2] = 8
+        if kitPieceSlot == hiTomIndex:
+            grooveArray[i,2] = 9
+
+    # grooveArray = np.zeros([len(hits), 4])
+    # openHiHatArtics = {0,1,2,3,6,7,19}
+    # closedHiHatGroupIndex = {6,7,8}
+    # crashIndex = 6
+    # kickIndex = 0
+    # snareIndex = 1
+    # hihatIndex = 2
+    # tomGroupIndex = {3,4,5}
+    # closedHiHatArtics = {10,11,14,15,16,17,18,20,8000}
+    # for i in range(len(hits)):
+    #
+    #     grooveArray[i,0] = hits[i].beats
+    #     grooveArray[i,1] = hits[i].velocity
+    #     kitPieceSlot = int(hits[i].slotIndex)
+    #     if kitPieceSlot == kickIndex:
+    #         grooveArray[i,2] == 0
+    #     if kitPieceSlot == snareIndex:
+    #         grooveArray[i,2] =1
+    #     # Split open and closed articulations into different categories.
+    #     if kitPieceSlot == hihatIndex:
+    #         if int(hits[i].articIndex) in openHiHatArtics:
+    #             grooveArray[i,2] = 3
+    #         else:
+    #             grooveArray[i,2] = 2
+    #     if kitPieceSlot in closedHiHatGroupIndex:
+    #         grooveArray[i,2] = 2
+    #     if kitPieceSlot == crashIndex:
+    #         grooveArray[i,2] = 3
+    #     if kitPieceSlot in tomGroupIndex:
+    #         grooveArray[i,2] = 4
     return grooveArray
 
 def getGrooveArray(hits, grooveLength, tempo):
@@ -240,18 +281,22 @@ def makeCollapsedBundleFeatures(groove, featureLength):
     :return: grooveFeatures -
     """
     timeIndex = np.arange(0, 8, 0.25).reshape((32, 1))  # 32 semiquavers = 2 bars
-    grooveMatrix = np.zeros([32, 5])
+    grooveMatrix = np.zeros([32, 10])
+    timingMatrix = np.zeros([32,10])
+    timingMatrix[:] = np.nan
+
     #print(grooveBundle[i])
     #print(grooveBundle[i].shape)
     for j in range(groove.shape[0]): #for # of hits in groove
         #put velocity value at time index of groove array in time slot in groove matrix
-        timePosition = int(groove[j,1]*4)
-        kitPiecePosition = int(groove[j, 3])
-        if timePosition < 32:
-            grooveMatrix[timePosition, kitPiecePosition] = groove[j,2]
+        timePosition = int(groove[j,0]*4)
+        kitPiecePosition = int(groove[j, 2])
+        timingMatrix[timePosition%32, kitPiecePosition] = groove[j,3]
+        grooveMatrix[timePosition%32, kitPiecePosition] = groove[j,2]
     # features stored as stack of vectors
+    timingFeatures = timingMatrix.flatten()
     features = grooveMatrix.flatten()
-    return features, grooveMatrix
+    return features, grooveMatrix, timingMatrix
 
 def makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves):
     """
@@ -269,12 +314,14 @@ def makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves):
     for i in range(0, len(flatAllPaletteNames)):
         #print(grooves[i])
         features, matrix , microtiming = makeCollapsedBundleFeatures(flatAllGrooves[i], featureLength)
+
         #print("Completed pallete:", i)
         #allGrooveFeatures = np.vstack((grooveFeatures, features))
+
         allGrooveFeatures.append(features)
         allGrooveMatricies.append(matrix)
         allMicrotimingFeatures.append(microtiming)
-    return allGrooveFeatures, allGrooveMatricies
+    return allGrooveFeatures, allGrooveMatricies, allMicrotimingFeatures
 
 np.set_printoptions(suppress=True,precision=2)
 
@@ -342,25 +389,26 @@ for sublist in allPaletteNames:
 
 featureLength = 160 #320 - collapsed semi mode
 #print(evalGrooveNames, "\n", allGrooveNames)
-print(flatAllGrooves)
 
-grooveFeatures, grooveMatricies = makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves)
+grooveFeatures, grooveMatricies, timingMatricies = makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves)
 
 # print(len(grooveFeatures))
 # print(len(flatAllGrooves))
 # print(len(flatAllPaletteNames))
 # print(len(grooveMatricies))
-print(grooveMatricies[i].shape)
+print(timingMatricies[i].shape)
 #
-print(flatAllGrooves[0])
-# print(grooveFeatures[0])
-# print(grooveMatricies[0])
+#print(flatAllGrooves[0])
+#print(grooveFeatures[0])
+print(grooveMatricies[0].shape)
+print(grooveMatricies[0])
 # print(allGrooveNames[0],flatAllPaletteNames[0])
 
 
 # for i in range(len(allGrooveNames)):
 #     print(allGrooveNames[i], paletteNames[i])
 #np.save("Eval-features.npy", grooveFeatures)
-#np.save("Eval-matricies.npy", grooveMatricies)
-#np.save("Eval-names.npy", allGrooveNames)
+# np.save("Eval-Groove-velocity-matricies.npy", grooveMatricies)
+# np.save("Eval-Groove-timing-matricies.npy", timingMatricies)
+# np.save("Eval-Groove-names.npy", allGrooveNames)
 #np.save("Eval-palette-names.npy", flatAllPaletteNames)
