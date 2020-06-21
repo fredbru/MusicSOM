@@ -72,6 +72,7 @@ def getCollapsedGrooveArray(hits, grooveLength):
         grooveArray[i,0] = hits[i].beats
         grooveArray[i,1] = hits[i].velocity
         kitPieceSlot = int(hits[i].slotIndex)
+        #print(hits[i].articIndex)
         if kitPieceSlot == kickIndex:
             grooveArray[i,2] == 0
         if kitPieceSlot == snareIndex:
@@ -291,11 +292,12 @@ def makeCollapsedBundleFeatures(groove, featureLength):
         #put velocity value at time index of groove array in time slot in groove matrix
         timePosition = int(groove[j,0]*4)
         kitPiecePosition = int(groove[j, 2])
-        timingMatrix[timePosition%32, kitPiecePosition] = groove[j,3]
-        grooveMatrix[timePosition%32, kitPiecePosition] = groove[j,2]
+        timingMatrix[timePosition%32, kitPiecePosition] = groove[j,2]
+        grooveMatrix[timePosition%32, kitPiecePosition] = groove[j,1]
     # features stored as stack of vectors
     timingFeatures = timingMatrix.flatten()
     features = grooveMatrix.flatten()
+    print(grooveMatrix)
     return features, grooveMatrix, timingMatrix
 
 def makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves):
@@ -320,7 +322,7 @@ def makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves):
 
         allGrooveFeatures.append(features)
         allGrooveMatricies.append(matrix)
-        allMicrotimingFeatures.append(microtiming)
+        #allMicrotimingFeatures.append(microtiming)
     return allGrooveFeatures, allGrooveMatricies, allMicrotimingFeatures
 
 np.set_printoptions(suppress=True,precision=2)
@@ -353,7 +355,7 @@ multiPalGrooveMatchingPalettes = ['Pop V2','Pop V2','Pop V1','Pop V2','Pop V2','
                                   'Funk V3','Funk V3','Funk V3','Funk V3','Essential Funk','Funk V3','Essential Funk','Essential Funk','Funk V2',
                                   'Essential Rock','Rock V1','Rock V1','Essential Rock', 'New Country V1']
 evalGrooveNames = []
-with open("/home/fred/BFD/python/Similarity-Eval/eval-grooves-list.csv") as csvfile:
+with open("/home/fred/BFD/python/Similarity-Eval/eval-pairings-reduced.csv") as csvfile:
     reader = csv.reader(csvfile, delimiter=",")
     for row in reader:
         evalGrooveNames.append(row[0])
@@ -365,6 +367,7 @@ for i in range(numberOfBundles): #numberOfBundles
     #print(i)
     grooveDom = parse((path + grooveFileNames[i]))
     grooveList, bundleGrooveNames, paletteNames = getGroovesFromBundle(grooveFileNames[i][0:-8],grooveDom, evalGrooveNames, multiPalGrooveList,multiPalGrooveMatchingPalettes)
+    print(str(bundleGrooveNames) + " " + str(paletteNames))
     for j in range(len(bundleGrooveNames)):
         # print(grooveList[0], bundleGrooveNames[0])
 
@@ -389,19 +392,23 @@ for sublist in allPaletteNames:
 
 featureLength = 160 #320 - collapsed semi mode
 #print(evalGrooveNames, "\n", allGrooveNames)
-
+print(allPaletteNames, evalGrooveNames)
 grooveFeatures, grooveMatricies, timingMatricies = makeAllFeatures(featureLength, flatAllPaletteNames, flatAllGrooves)
 
 # print(len(grooveFeatures))
 # print(len(flatAllGrooves))
 # print(len(flatAllPaletteNames))
 # print(len(grooveMatricies))
-print(timingMatricies[i].shape)
 #
 #print(flatAllGrooves[0])
 #print(grooveFeatures[0])
-print(grooveMatricies[0].shape)
-print(grooveMatricies[0])
+
+# for i in range(len(grooveMatricies)):
+#     print('\n')
+#     print(grooveMatricies[i], allGrooveNames[i])
+#     np.savetxt((allGrooveNames[i] + ".csv"), grooveMatricies[i], delimiter=",", fmt="%.2f")
+
+
 # print(allGrooveNames[0],flatAllPaletteNames[0])
 
 
